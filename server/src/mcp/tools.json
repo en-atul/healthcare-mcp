@@ -1,0 +1,96 @@
+{
+  "tools": [
+    {
+      "name": "list-therapists",
+      "description": "List all available therapists with their specializations and contact information",
+      "inputSchema": {
+        "type": "object",
+        "properties": {},
+        "required": []
+      }
+    },
+    {
+      "name": "book-appointment",
+      "description": "Book an appointment with a therapist. Requires valid JWT token for authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jwtToken": {
+            "type": "string",
+            "description": "Valid JWT token for patient authentication"
+          },
+          "therapistId": {
+            "type": "string",
+            "description": "ID of the therapist to book with"
+          },
+          "appointmentDate": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Date and time for the appointment (ISO 8601 format)"
+          },
+          "duration": {
+            "type": "number",
+            "minimum": 15,
+            "maximum": 180,
+            "description": "Duration of appointment in minutes (15-180)"
+          },
+          "notes": {
+            "type": "string",
+            "description": "Optional notes for the appointment"
+          }
+        },
+        "required": ["jwtToken", "therapistId", "appointmentDate", "duration"]
+      }
+    },
+    {
+      "name": "list-appointments",
+      "description": "List all upcoming appointments for a patient. Requires valid JWT token for authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jwtToken": {
+            "type": "string",
+            "description": "Valid JWT token for patient authentication"
+          }
+        },
+        "required": ["jwtToken"]
+      }
+    },
+    {
+      "name": "cancel-appointment",
+      "description": "Cancel an existing appointment. Requires valid JWT token and appointment ID. Only the patient who booked the appointment can cancel it.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jwtToken": {
+            "type": "string",
+            "description": "Valid JWT token for patient authentication"
+          },
+          "appointmentId": {
+            "type": "string",
+            "description": "ID of the appointment to cancel"
+          },
+          "cancellationReason": {
+            "type": "string",
+            "description": "Optional reason for cancellation"
+          }
+        },
+        "required": ["jwtToken", "appointmentId"]
+      }
+    },
+    {
+      "name": "get-profile",
+      "description": "Get the patient's profile information. Requires valid JWT token for authentication.",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "jwtToken": {
+            "type": "string",
+            "description": "Valid JWT token for patient authentication"
+          }
+        },
+        "required": ["jwtToken"]
+      }
+    }
+  ]
+}
