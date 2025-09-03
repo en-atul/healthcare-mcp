@@ -90,15 +90,9 @@ server.registerTool(
   {
     title: 'Book Appointment',
     description: 'Book a new appointment with a therapist',
-    inputSchema: BookAppointmentSchema,
+    inputSchema: BookAppointmentSchema.shape,
   },
-  async (extra) => {
-    const args = extra.params as {
-      therapistId: string;
-      appointmentDate: string;
-      duration: number;
-      notes?: string;
-    };
+  (args) => {
     const { therapistId, appointmentDate, duration, notes } = args;
     // In a real implementation, this would create the appointment in your database
     const appointmentId = `apt_${Date.now()}`;
@@ -120,11 +114,10 @@ server.registerTool(
   {
     title: 'List Patient Appointments',
     description: 'Get a list of all appointments for a specific patient',
-    inputSchema: ListAppointmentsSchema,
+    inputSchema: ListAppointmentsSchema.shape,
   },
-  async (extra) => {
-    const args = extra.params as { patientId: string };
-    const { patientId } = args;
+  () => {
+    // const { patientId } = args;
     // In a real implementation, this would fetch from your database
     const appointments: Appointment[] = [
       {
@@ -175,13 +168,9 @@ server.registerTool(
     title: 'Cancel Appointment',
     description:
       'Cancel an existing appointment with optional cancellation reason',
-    inputSchema: CancelAppointmentSchema,
+    inputSchema: CancelAppointmentSchema.shape,
   },
-  async (extra) => {
-    const args = extra.params as {
-      appointmentId: string;
-      cancellationReason?: string;
-    };
+  (args) => {
     const { appointmentId, cancellationReason } = args;
     // In a real implementation, this would update your database
     return {
@@ -201,11 +190,10 @@ server.registerTool(
   {
     title: 'Get Patient Profile',
     description: 'Retrieve the profile information for a specific patient',
-    inputSchema: GetProfileSchema,
+    inputSchema: GetProfileSchema.shape,
   },
-  async (extra) => {
-    const args = extra.params as { patientId: string };
-    const { patientId } = args;
+  () => {
+    // const { patientId } = args;
     // In a real implementation, this would fetch from your database
     const profile: PatientProfile = {
       firstName: 'John',
