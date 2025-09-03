@@ -28,7 +28,10 @@ export class McpClientService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async callTool(tool: string, args: any): Promise<any> {
+  async callTool(
+    tool: string,
+    args: Record<string, unknown>,
+  ): Promise<unknown> {
     try {
       if (!this.client) {
         throw new Error('MCP client not connected');
@@ -58,7 +61,7 @@ export class McpClientService implements OnModuleInit, OnModuleDestroy {
   }
 
   // Helper methods for specific healthcare operations
-  async listTherapists(): Promise<any> {
+  async listTherapists(): Promise<unknown> {
     return this.callTool('list_therapists', {});
   }
 
@@ -67,7 +70,7 @@ export class McpClientService implements OnModuleInit, OnModuleDestroy {
     appointmentDate: string,
     duration: number,
     notes?: string,
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.callTool('book_appointment', {
       therapistId,
       appointmentDate,
@@ -76,21 +79,21 @@ export class McpClientService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async listAppointments(patientId: string): Promise<any> {
+  async listAppointments(patientId: string): Promise<unknown> {
     return this.callTool('list_appointments', { patientId });
   }
 
   async cancelAppointment(
     appointmentId: string,
     cancellationReason?: string,
-  ): Promise<any> {
+  ): Promise<unknown> {
     return this.callTool('cancel_appointment', {
       appointmentId,
       cancellationReason,
     });
   }
 
-  async getProfile(patientId: string): Promise<any> {
+  async getProfile(patientId: string): Promise<unknown> {
     return this.callTool('get_profile', { patientId });
   }
 }

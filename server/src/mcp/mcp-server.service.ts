@@ -32,14 +32,21 @@ export class McpServerService {
   // Helper method to extract patient ID from JWT token
   private extractPatientIdFromToken(token: string): string {
     try {
-      const payload = this.jwtService.verify(token);
+      const payload = this.jwtService.verify(token) satisfies {
+        sub: string;
+        role: string;
+        email?: string;
+        [key: string]: unknown;
+      };
+
       if (!payload.sub || payload.role !== 'patient') {
         throw new UnauthorizedException(
           'Invalid token: patient access required',
         );
       }
       return payload.sub;
-    } catch (error) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    } catch (error: any) {
       throw new UnauthorizedException('Invalid or expired JWT token');
     }
   }
@@ -129,7 +136,11 @@ export class McpServerService {
 
       const appointmentsList = appointments
         .map((apt) => {
-          const therapist = apt.therapistId as any; // Type assertion for populated data
+          const therapist = apt.therapistId as unknown as {
+            firstName: string;
+            lastName: string;
+            [key: string]: unknown;
+          };
           return `- ${new Date(apt.appointmentDate).toLocaleString()} with Dr. ${therapist.firstName} ${therapist.lastName} (${apt.status})`;
         })
         .join('\n');

@@ -5,6 +5,7 @@ import {
   Get,
   UseGuards,
   Request,
+  Req,
 } from '@nestjs/common';
 import { McpServerService } from './mcp-server.service';
 import { LlmIntegrationService } from './llm-integration.service';
@@ -37,9 +38,15 @@ export class McpController {
       duration: number;
       notes?: string;
     },
-    @Request() req,
+    @Req() req: Request,
   ) {
-    const jwtToken = req.headers.authorization?.replace('Bearer ', '');
+    const authorization = req.headers.get('Authorization');
+    const jwtToken = authorization?.replace('Bearer ', '');
+
+    if (!jwtToken) {
+      return;
+    }
+
     return this.mcpService.bookAppointment(
       jwtToken,
       body.therapistId,
@@ -51,8 +58,14 @@ export class McpController {
 
   @Post('list-appointments')
   @UseGuards(JwtAuthGuard)
-  async listAppointments(@Request() req) {
-    const jwtToken = req.headers.authorization?.replace('Bearer ', '');
+  async listAppointments(@Req() req: Request) {
+    const authorization = req.headers.get('Authorization');
+    const jwtToken = authorization?.replace('Bearer ', '');
+
+    if (!jwtToken) {
+      return;
+    }
+
     return this.mcpService.listAppointments(jwtToken);
   }
 
@@ -64,9 +77,14 @@ export class McpController {
       appointmentId: string;
       cancellationReason?: string;
     },
-    @Request() req,
+    @Req() req: Request,
   ) {
-    const jwtToken = req.headers.authorization?.replace('Bearer ', '');
+    const authorization = req.headers.get('Authorization');
+    const jwtToken = authorization?.replace('Bearer ', '');
+
+    if (!jwtToken) {
+      return;
+    }
     return this.mcpService.cancelAppointment(
       jwtToken,
       body.appointmentId,
@@ -76,16 +94,28 @@ export class McpController {
 
   @Post('get-profile')
   @UseGuards(JwtAuthGuard)
-  async getProfile(@Request() req) {
-    const jwtToken = req.headers.authorization?.replace('Bearer ', '');
+  async getProfile(@Req() req: Request) {
+    const authorization = req.headers.get('Authorization');
+    const jwtToken = authorization?.replace('Bearer ', '');
+
+    if (!jwtToken) {
+      return;
+    }
     return this.mcpService.getProfile(jwtToken);
   }
 
   // Chat endpoint for frontend to send messages
   @Post('chat')
-  async chat(@Body() body: { message: string }, @Request() req) {
-    const jwtToken = req.headers.authorization?.replace('Bearer ', '');
-    return this.llmIntegrationService.processUserMessage(
+  async chat(@Body() body: { message: string }, @Req() req: Request) {
+    const authorization = req.headers.get('Authorization');
+    const jwtToken = authorization?.replace('Bearer ', '');
+
+    if (!jwtToken) {
+      return;
+    }
+
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
+    return await this.llmIntegrationService.processUserMessage(
       body.message,
       jwtToken,
     );

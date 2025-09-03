@@ -15,7 +15,7 @@ import { ConfigService } from './config/config.service';
     ConfigModule,
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
-      useFactory: async (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         uri: configService.databaseUrl,
       }),
       inject: [ConfigService],
