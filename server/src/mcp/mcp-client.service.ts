@@ -1,5 +1,5 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { ConfigService } from '../config/config.service';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
@@ -11,15 +11,16 @@ export class McpClientService implements OnModuleInit, OnModuleDestroy {
 
   async onModuleInit() {
     try {
-      const mcpConfig = this.configService.get('mcp');
-
       const transport = new StdioClientTransport({
-        command: mcpConfig.serverCommand,
-        args: mcpConfig.serverArgs,
+        command: this.configService.mcpServerCommand,
+        args: this.configService.mcpServerArgs,
       });
 
-      this.client = new Client(transport);
-      await this.client.connect();
+      this.client = new Client({
+        name: 'healthcare-mcp-client',
+        version: '1.0.0',
+      });
+      await this.client.connect(transport);
       console.log('✅ MCP client connected to healthcare server');
     } catch (error) {
       console.error('❌ Failed to connect to MCP server:', error);
@@ -27,14 +28,17 @@ export class McpClientService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  async callTool(tool: string, args: any) {
+  async callTool(tool: string, args: any): Promise<any> {
     try {
       if (!this.client) {
         throw new Error('MCP client not connected');
       }
 
       // Use the correct MCP SDK method for calling tools
-      const result = await this.client.callTool(tool, args);
+      const result = await this.client.callTool({
+        name: tool,
+        arguments: args,
+      });
       return result;
     } catch (error) {
       console.error(`Error calling MCP tool ${tool}:`, error);
@@ -54,7 +58,7 @@ export class McpClientService implements OnModuleInit, OnModuleDestroy {
   }
 
   // Helper methods for specific healthcare operations
-  async listTherapists() {
+  async listTherapists(): Promise<any> {
     return this.callTool('list_therapists', {});
   }
 
@@ -63,7 +67,7 @@ export class McpClientService implements OnModuleInit, OnModuleDestroy {
     appointmentDate: string,
     duration: number,
     notes?: string,
-  ) {
+  ): Promise<any> {
     return this.callTool('book_appointment', {
       therapistId,
       appointmentDate,
@@ -72,18 +76,21 @@ export class McpClientService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async listAppointments(patientId: string) {
+  async listAppointments(patientId: string): Promise<any> {
     return this.callTool('list_appointments', { patientId });
   }
 
-  async cancelAppointment(appointmentId: string, cancellationReason?: string) {
+  async cancelAppointment(
+    appointmentId: string,
+    cancellationReason?: string,
+  ): Promise<any> {
     return this.callTool('cancel_appointment', {
       appointmentId,
       cancellationReason,
     });
   }
 
-  async getProfile(patientId: string) {
+  async getProfile(patientId: string): Promise<any> {
     return this.callTool('get_profile', { patientId });
   }
 }

@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { ConfigService } from '../config/config.service';
 import OpenAI from 'openai';
 
 @Injectable()
@@ -7,17 +7,13 @@ export class LlmService {
   private openai: OpenAI;
 
   constructor(private configService: ConfigService) {
-    const openaiConfig = this.configService.get('openai');
-    
-    this.openai = new OpenAI({ 
-      apiKey: openaiConfig.apiKey 
+    this.openai = new OpenAI({
+      apiKey: this.configService.openaiApiKey,
     });
   }
 
   async planToolCall(userInput: string) {
     try {
-      const openaiConfig = this.configService.get('openai');
-      
       const systemPrompt = `You are a healthcare assistant. Convert user input into a JSON MCP tool call.
 
 Available tools:
@@ -36,14 +32,14 @@ Examples:
 - "Cancel my 3 PM appointment" → {"tool": "cancel_appointment", "args": {"appointmentId": "3 PM appointment"}}`;
 
       const response = await this.openai.chat.completions.create({
-        model: openaiConfig.model,
+        model: this.configService.openaiModel,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: userInput }
+          { role: 'user', content: userInput },
         ],
         response_format: { type: 'json_object' },
-        temperature: openaiConfig.temperature,
-        max_tokens: openaiConfig.maxTokens,
+        temperature: this.configService.openaiTemperature,
+        max_tokens: this.configService.openaiMaxTokens,
       });
 
       const content = response.choices[0]?.message?.content;
@@ -60,21 +56,22 @@ Examples:
 
   async formatResult(rawResult: any) {
     try {
-      const openaiConfig = this.configService.get('openai');
-      
       const systemPrompt = `You are a helpful healthcare assistant. Format the tool result into friendly, natural text that a patient would understand. Be professional but warm.`;
 
       const response = await this.openai.chat.completions.create({
-        model: openaiConfig.model,
+        model: this.configService.openaiModel,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: JSON.stringify(rawResult) }
+          { role: 'user', content: JSON.stringify(rawResult) },
         ],
-        temperature: openaiConfig.temperature,
-        max_tokens: openaiConfig.maxTokens,
+        temperature: this.configService.openaiTemperature,
+        max_tokens: this.configService.openaiMaxTokens,
       });
 
-      return response.choices[0]?.message?.content || 'I have the information for you.';
+      return (
+        response.choices[0]?.message?.content ||
+        'I have the information for you.'
+      );
     } catch (error) {
       console.error('Error formatting result:', error);
       // Fallback to raw result if formatting fails
@@ -85,7 +82,7 @@ Examples:
     }
   }
 
-  async getSystemPrompt() {
+  getSystemPrompt() {
     return `You are a healthcare assistant integrated with a healthcare management system. You can help patients with:
 
 1. **Listing Therapists**: Show available therapists and their specializations

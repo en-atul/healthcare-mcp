@@ -1,3 +1,5 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
+
 import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { AppointmentsService } from '../appointments/appointments.service';
@@ -13,7 +15,7 @@ export class McpServerService {
     private readonly jwtService: JwtService,
   ) {}
 
-  async onModuleInit() {
+  onModuleInit() {
     console.log('MCP Server service initialized');
     console.log('Available tools for LLM integration:');
     console.log('- list-therapists: List all available therapists');

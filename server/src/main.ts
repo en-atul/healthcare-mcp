@@ -1,22 +1,28 @@
+/* eslint-disable @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access */
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
-import { ConfigService } from '@nestjs/config';
+import { ConfigService } from './config/config.service';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
   const configService = app.get(ConfigService);
 
-  // Get configuration values
-  const port = configService.get('port');
-  const corsConfig = configService.get('cors');
-  const appConfig = configService.get('app');
+  // Get configuration values using typed getters
+  const port = configService.port;
+  const corsOrigin = configService.corsOrigin;
+  const corsCredentials = configService.corsCredentials;
+  const corsMethods = configService.corsMethods;
+  const appName = configService.appName;
+  const appVersion = configService.appVersion;
+  const appEnvironment = configService.appEnvironment;
+  const appDebug = configService.appDebug;
 
   // Enable CORS with configuration
   app.enableCors({
-    origin: corsConfig.origin,
-    credentials: corsConfig.credentials,
-    methods: corsConfig.methods,
+    origin: corsOrigin,
+    credentials: corsCredentials,
+    methods: corsMethods,
   });
 
   // Enable validation pipes
@@ -30,9 +36,9 @@ async function bootstrap() {
 
   await app.listen(port);
   console.log(
-    `🚀 ${appConfig.name} v${appConfig.version} is running on: http://localhost:${port}`,
+    `🚀 ${appName} v${appVersion} is running on: http://localhost:${port}`,
   );
-  console.log(`🌍 Environment: ${appConfig.environment}`);
-  console.log(`🔧 Debug mode: ${appConfig.debug ? 'enabled' : 'disabled'}`);
+  console.log(`🌍 Environment: ${appEnvironment}`);
+  console.log(`🔧 Debug mode: ${appDebug ? 'enabled' : 'disabled'}`);
 }
 bootstrap();

@@ -1,5 +1,4 @@
 import { Module } from '@nestjs/common';
-import { ConfigModule, ConfigService } from '@nestjs/config';
 import { MongooseModule } from '@nestjs/mongoose';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -8,18 +7,16 @@ import { PatientsModule } from './patients/patients.module';
 import { TherapistsModule } from './therapists/therapists.module';
 import { AppointmentsModule } from './appointments/appointments.module';
 import { ChatModule } from './chat/chat.module';
-import configuration from './config/configuration';
+import { ConfigModule } from './config/config.module';
+import { ConfigService } from './config/config.service';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({
-      isGlobal: true,
-      load: [configuration],
-    }),
+    ConfigModule,
     MongooseModule.forRootAsync({
       imports: [ConfigModule],
       useFactory: async (configService: ConfigService) => ({
-        uri: await configService.get('database.uri'),
+        uri: configService.databaseUrl,
       }),
       inject: [ConfigService],
     }),

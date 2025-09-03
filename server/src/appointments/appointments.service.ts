@@ -1,13 +1,17 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model, Types } from 'mongoose';
 import { Appointment, AppointmentDocument } from './schemas/appointment.schema';
-import { CreateAppointmentDto, UpdateAppointmentDto } from './dto/appointment.dto';
+import {
+  CreateAppointmentDto,
+  UpdateAppointmentDto,
+} from './dto/appointment.dto';
 
 @Injectable()
 export class AppointmentsService {
   constructor(
-    @InjectModel(Appointment.name) private appointmentModel: Model<AppointmentDocument>,
+    @InjectModel(Appointment.name)
+    private appointmentModel: Model<AppointmentDocument>,
   ) {}
 
   async create(createAppointmentDto: CreateAppointmentDto, patientId: string) {
@@ -22,42 +26,44 @@ export class AppointmentsService {
   }
 
   async findAll() {
-    return this.appointmentModel.find()
+    return this.appointmentModel
+      .find()
       .populate('patientId', 'firstName lastName email')
       .populate('therapistId', 'firstName lastName specialization');
   }
 
   async findByPatientId(patientId: string) {
-    return this.appointmentModel.find({ patientId: new Types.ObjectId(patientId) })
+    return this.appointmentModel
+      .find({ patientId: new Types.ObjectId(patientId) })
       .populate('patientId', 'firstName lastName email')
       .populate('therapistId', 'firstName lastName specialization');
   }
 
   async findByTherapistId(therapistId: string) {
-    return this.appointmentModel.find({ therapistId: new Types.ObjectId(therapistId) })
+    return this.appointmentModel
+      .find({ therapistId: new Types.ObjectId(therapistId) })
       .populate('patientId', 'firstName lastName email')
       .populate('therapistId', 'firstName lastName specialization');
   }
 
   async findOne(id: string) {
-    const appointment = await this.appointmentModel.findById(id)
+    const appointment = await this.appointmentModel
+      .findById(id)
       .populate('patientId', 'firstName lastName email')
       .populate('therapistId', 'firstName lastName specialization');
-    
+
     if (!appointment) {
       throw new NotFoundException('Appointment not found');
     }
-    
+
     return appointment;
   }
 
   async update(id: string, updateAppointmentDto: UpdateAppointmentDto) {
-    const appointment = await this.appointmentModel.findByIdAndUpdate(
-      id,
-      updateAppointmentDto,
-      { new: true }
-    ).populate('patientId', 'firstName lastName email')
-     .populate('therapistId', 'firstName lastName specialization');
+    const appointment = await this.appointmentModel
+      .findByIdAndUpdate(id, updateAppointmentDto, { new: true })
+      .populate('patientId', 'firstName lastName email')
+      .populate('therapistId', 'firstName lastName specialization');
 
     if (!appointment) {
       throw new NotFoundException('Appointment not found');

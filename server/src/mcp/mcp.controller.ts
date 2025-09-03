@@ -1,4 +1,11 @@
-import { Controller, Post, Body, Get, UseGuards, Request } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Body,
+  Get,
+  UseGuards,
+  Request,
+} from '@nestjs/common';
 import { McpServerService } from './mcp-server.service';
 import { LlmIntegrationService } from './llm-integration.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
@@ -23,13 +30,14 @@ export class McpController {
   @Post('book-appointment')
   @UseGuards(JwtAuthGuard)
   async bookAppointment(
-    @Body() body: {
+    @Body()
+    body: {
       therapistId: string;
       appointmentDate: string;
       duration: number;
       notes?: string;
     },
-    @Request() req
+    @Request() req,
   ) {
     const jwtToken = req.headers.authorization?.replace('Bearer ', '');
     return this.mcpService.bookAppointment(
@@ -37,7 +45,7 @@ export class McpController {
       body.therapistId,
       body.appointmentDate,
       body.duration,
-      body.notes
+      body.notes,
     );
   }
 
@@ -51,17 +59,18 @@ export class McpController {
   @Post('cancel-appointment')
   @UseGuards(JwtAuthGuard)
   async cancelAppointment(
-    @Body() body: {
+    @Body()
+    body: {
       appointmentId: string;
       cancellationReason?: string;
     },
-    @Request() req
+    @Request() req,
   ) {
     const jwtToken = req.headers.authorization?.replace('Bearer ', '');
     return this.mcpService.cancelAppointment(
       jwtToken,
       body.appointmentId,
-      body.cancellationReason
+      body.cancellationReason,
     );
   }
 
@@ -74,12 +83,12 @@ export class McpController {
 
   // Chat endpoint for frontend to send messages
   @Post('chat')
-  async chat(
-    @Body() body: { message: string },
-    @Request() req
-  ) {
+  async chat(@Body() body: { message: string }, @Request() req) {
     const jwtToken = req.headers.authorization?.replace('Bearer ', '');
-    return this.llmIntegrationService.processUserMessage(body.message, jwtToken);
+    return this.llmIntegrationService.processUserMessage(
+      body.message,
+      jwtToken,
+    );
   }
 
   // Endpoint for LLM to get tool descriptions
@@ -87,7 +96,7 @@ export class McpController {
   getLlmTools() {
     return {
       tools: this.mcpService.getAvailableTools(),
-      systemPrompt: this.llmIntegrationService.getSystemPrompt()
+      systemPrompt: this.llmIntegrationService.getSystemPrompt(),
     };
   }
 }
