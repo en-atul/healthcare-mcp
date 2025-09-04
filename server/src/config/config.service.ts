@@ -111,6 +111,15 @@ export class ConfigService {
     );
   }
 
+  // ChromaDB configuration
+  get chromaUrl(): string {
+    return this.configService.get<string>('chroma.url') || 'http://localhost:8000';
+  }
+
+  get chromaCollectionName(): string {
+    return this.configService.get<string>('chroma.collectionName') || 'healthcare_conversations';
+  }
+
   // CORS configuration
   get corsOrigin(): string | string[] {
     return this.configService.get<string | string[]>('cors.origin') || '*';

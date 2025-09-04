@@ -11,5 +11,15 @@ services:
     volumes:
       - mongo-data:/data/db
 
+  chroma:
+    image: ghcr.io/chroma-core/chroma:latest
+    container_name: healthcare-chroma
+    ports:
+      - '8001:8000'
+    volumes:
+      - chroma_data:/chroma/.chroma
+    restart: always
+
 volumes:
   mongo-data:
+  chroma_data:
