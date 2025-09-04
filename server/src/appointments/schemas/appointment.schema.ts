@@ -5,6 +5,8 @@ export type AppointmentDocument = Appointment & Document;
 
 @Schema({ timestamps: true })
 export class Appointment {
+  _id: Types.ObjectId;
+
   @Prop({ type: Types.ObjectId, ref: 'Patient', required: true })
   patientId: Types.ObjectId;
 
@@ -25,6 +27,9 @@ export class Appointment {
 
   @Prop()
   cancellationReason: string;
+
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export const AppointmentSchema = SchemaFactory.createForClass(Appointment);

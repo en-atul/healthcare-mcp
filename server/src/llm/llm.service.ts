@@ -12,7 +12,14 @@ export class LlmService {
     });
   }
 
-  async planToolCall(userInput: string) {
+  async planToolCall(
+    userInput: string,
+    user: {
+      sub: string;
+      email: string;
+      role: string;
+    },
+  ) {
     try {
       const systemPrompt = `You are a healthcare assistant. Convert user input into a JSON MCP tool call.
 
@@ -28,8 +35,11 @@ Return ONLY a valid JSON object like:
 
 Examples:
 - "Show me therapists" → {"tool": "list_therapists", "args": {}}
-- "Book appointment with Dr. Smith tomorrow at 2 PM for 60 minutes" → {"tool": "book_appointment", "args": {"therapistId": "Dr. Smith", "appointmentDate": "tomorrow at 2 PM", "duration": 60}}
-- "Cancel my 3 PM appointment" → {"tool": "cancel_appointment", "args": {"appointmentId": "3 PM appointment"}}`;
+- "Book appointment with Dr. Smith tomorrow at 2 PM for 60 minutes. Date should be in ISO format" → {"tool": "book_appointment", "args": {"therapistId": "Dr. Smith", "appointmentDate": "tomorrow at 2 PM", "duration": 60}}
+- "Cancel my 3 PM appointment" → {"tool": "cancel_appointment", "args": {"appointmentId": "3 PM appointment"}}
+
+logged in user's data → user's id=${user.sub} and user's role=${user.role}
+`;
 
       const response = await this.openai.chat.completions.create({
         model: this.configService.openaiModel,

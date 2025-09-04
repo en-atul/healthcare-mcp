@@ -6,17 +6,38 @@ import {
   UseGuards,
   Request,
   Req,
+  Headers,
+  UnauthorizedException,
 } from '@nestjs/common';
 import { McpServerService } from './mcp-server.service';
 import { LlmIntegrationService } from './llm-integration.service';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { ConfigService } from '../config/config.service';
 
 @Controller('mcp')
 export class McpController {
   constructor(
     private readonly mcpService: McpServerService,
     private readonly llmIntegrationService: LlmIntegrationService,
+    private readonly configService: ConfigService,
   ) {}
+
+  // Helper method to validate MCP API key (only for external requests)
+  private validateMcpApiKey(apiKey: string, req: Request): boolean {
+    // Skip API key validation for internal NestJS requests
+    const userAgent = req.headers['user-agent'] || '';
+    const isInternalRequest =
+      userAgent.includes('NestJS') ||
+      req.headers['x-internal-request'] === 'true' ||
+      req.headers['x-mcp-api-key'] === undefined;
+
+    if (isInternalRequest) {
+      return true; // Allow internal requests without API key
+    }
+
+    // Require API key for external requests (Claude/ChatGPT)
+    return apiKey === this.configService.mcpApiKey;
+  }
 
   @Get('tools')
   getAvailableTools() {
@@ -24,7 +45,13 @@ export class McpController {
   }
 
   @Post('list-therapists')
-  async listTherapists() {
+  async listTherapists(
+    @Headers('x-mcp-api-key') apiKey: string | undefined,
+    @Req() req: Request,
+  ) {
+    if (!this.validateMcpApiKey(apiKey || '', req)) {
+      throw new UnauthorizedException('Invalid MCP API key');
+    }
     return this.mcpService.listTherapists();
   }
 
@@ -38,8 +65,13 @@ export class McpController {
       duration: number;
       notes?: string;
     },
+    @Headers('x-mcp-api-key') apiKey: string | undefined,
     @Req() req: Request,
   ) {
+    if (!this.validateMcpApiKey(apiKey || '', req)) {
+      throw new UnauthorizedException('Invalid MCP API key');
+    }
+
     const authorization = req.headers.get('Authorization');
     const jwtToken = authorization?.replace('Bearer ', '');
 
@@ -58,7 +90,14 @@ export class McpController {
 
   @Post('list-appointments')
   @UseGuards(JwtAuthGuard)
-  async listAppointments(@Req() req: Request) {
+  async listAppointments(
+    @Headers('x-mcp-api-key') apiKey: string | undefined,
+    @Req() req: Request,
+  ) {
+    if (!this.validateMcpApiKey(apiKey || '', req)) {
+      throw new UnauthorizedException('Invalid MCP API key');
+    }
+
     const authorization = req.headers.get('Authorization');
     const jwtToken = authorization?.replace('Bearer ', '');
 
@@ -77,8 +116,13 @@ export class McpController {
       appointmentId: string;
       cancellationReason?: string;
     },
+    @Headers('x-mcp-api-key') apiKey: string | undefined,
     @Req() req: Request,
   ) {
+    if (!this.validateMcpApiKey(apiKey || '', req)) {
+      throw new UnauthorizedException('Invalid MCP API key');
+    }
+
     const authorization = req.headers.get('Authorization');
     const jwtToken = authorization?.replace('Bearer ', '');
 
@@ -94,7 +138,14 @@ export class McpController {
 
   @Post('get-profile')
   @UseGuards(JwtAuthGuard)
-  async getProfile(@Req() req: Request) {
+  async getProfile(
+    @Headers('x-mcp-api-key') apiKey: string | undefined,
+    @Req() req: Request,
+  ) {
+    if (!this.validateMcpApiKey(apiKey || '', req)) {
+      throw new UnauthorizedException('Invalid MCP API key');
+    }
+
     const authorization = req.headers.get('Authorization');
     const jwtToken = authorization?.replace('Bearer ', '');
 

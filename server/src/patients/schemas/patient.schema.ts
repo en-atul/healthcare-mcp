@@ -1,10 +1,12 @@
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
-import { Document } from 'mongoose';
+import { Document, Types } from 'mongoose';
 
 export type PatientDocument = Patient & Document;
 
 @Schema({ timestamps: true })
 export class Patient {
+  _id: Types.ObjectId;
+
   @Prop({ required: true, unique: true })
   email: string;
 
@@ -28,6 +30,9 @@ export class Patient {
 
   @Prop({ default: 'patient' })
   role: string;
+
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 export const PatientSchema = SchemaFactory.createForClass(Patient);

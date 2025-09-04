@@ -1,272 +1,358 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import {
-  BookAppointmentSchema,
-  CancelAppointmentSchema,
-  ListAppointmentsSchema,
-} from './schemas/appointment.schema';
-import { GetProfileSchema } from './schemas/user.schema';
+import { z } from 'zod';
+import axios from 'axios';
 
-// Define types for our healthcare data
-interface Therapist {
-  firstName: string;
-  lastName: string;
-  specialization: string;
-  email: string;
-}
+// Configuration
+const NESTJS_BASE_URL = process.env.NESTJS_BASE_URL || 'http://localhost:3000';
+const MCP_API_KEY =
+  process.env.MCP_API_KEY || 'your-secret-mcp-api-key-change-in-production';
 
-interface Appointment {
-  date: string;
-  therapist: string;
-  status: string;
-}
-
-interface PatientProfile {
-  firstName: string;
-  lastName: string;
-  email: string;
-  phone: string;
-  address: string;
-}
-
-// Create MCP server instance
+// Create MCP server
 const server = new McpServer({
-  name: 'healthcare-server',
+  name: 'healthcare-mcp-server',
   version: '1.0.0',
 });
 
-// Tool to list available therapists
+// Helper function to make HTTP calls to NestJS backend
+async function callNestjsEndpoint(
+  endpoint: string,
+  data: any = {},
+  headers: any = {},
+) {
+  try {
+    const response = await axios.post(
+      `${NESTJS_BASE_URL}/mcp/${endpoint}`,
+      data,
+      {
+        headers: {
+          'Content-Type': 'application/json',
+          'X-MCP-API-Key': MCP_API_KEY,
+          ...headers,
+        },
+      },
+    );
+    return response.data;
+  } catch (error: any) {
+    console.error(
+      `Error calling ${endpoint}:`,
+      error.response?.data || error.message,
+    );
+    throw new Error(
+      `Failed to call ${endpoint}: ${error.response?.data?.message || error.message}`,
+    );
+  }
+}
+
+// Helper function to validate API key
+function validateApiKey(apiKey: string): boolean {
+  return apiKey === MCP_API_KEY;
+}
+
+// Register tools
 server.registerTool(
-  'list_therapists',
+  'list-therapists',
   {
     title: 'List Available Therapists',
     description:
       'Get a list of all available therapists with their specializations and contact information',
+    inputSchema: z.object({
+      apiKey: z.string().describe('API key for authentication'),
+    }).shape,
   },
-  () => {
-    // In a real implementation, this would connect to your database
-    const therapists: Therapist[] = [
-      {
-        firstName: 'Dr. John',
-        lastName: 'Smith',
-        specialization: 'Psychotherapy',
-        email: 'dr.smith@healthcare.com',
-      },
-      {
-        firstName: 'Dr. Sarah',
-        lastName: 'Johnson',
-        specialization: 'Cognitive Behavioral Therapy',
-        email: 'dr.johnson@healthcare.com',
-      },
-      {
-        firstName: 'Dr. Michael',
-        lastName: 'Williams',
-        specialization: 'Family Therapy',
-        email: 'dr.williams@healthcare.com',
-      },
-    ];
+  async (args) => {
+    try {
+      // Validate API key
+      if (!validateApiKey(args.apiKey)) {
+        throw new Error('Invalid API key');
+      }
 
-    const therapistList = therapists
-      .map(
-        (t) =>
-          `Dr. ${t.firstName} ${t.lastName} - ${t.specialization} (${t.email})`,
-      )
-      .join('\n');
+      // Call NestJS endpoint
+      const result = await callNestjsEndpoint('list-therapists');
 
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Available therapists:\n${therapistList}`,
-        },
-      ],
-    };
-  },
-);
-
-// Tool to book an appointment
-server.registerTool(
-  'book_appointment',
-  {
-    title: 'Book Appointment',
-    description: 'Book a new appointment with a therapist',
-    inputSchema: BookAppointmentSchema.shape,
-  },
-  (args) => {
-    const { therapistId, appointmentDate, duration, notes } = args;
-    // In a real implementation, this would create the appointment in your database
-    const appointmentId = `apt_${Date.now()}`;
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Appointment booked successfully!\n\nDetails:\n- Therapist ID: ${therapistId}\n- Date: ${appointmentDate}\n- Duration: ${duration} minutes\n- Appointment ID: ${appointmentId}\n- Notes: ${notes || 'None'}`,
-        },
-      ],
-    };
-  },
-);
-
-// Tool to list patient appointments
-server.registerTool(
-  'list_appointments',
-  {
-    title: 'List Patient Appointments',
-    description: 'Get a list of all appointments for a specific patient',
-    inputSchema: ListAppointmentsSchema.shape,
-  },
-  () => {
-    // const { patientId } = args;
-    // In a real implementation, this would fetch from your database
-    const appointments: Appointment[] = [
-      {
-        date: '2024-01-15T10:00:00Z',
-        therapist: 'Dr. Smith',
-        status: 'confirmed',
-      },
-      {
-        date: '2024-01-20T14:00:00Z',
-        therapist: 'Dr. Johnson',
-        status: 'scheduled',
-      },
-    ];
-
-    if (appointments.length === 0) {
+      if (result.success) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                result.formattedResponse ||
+                `Found ${result.data.length} therapists`,
+            },
+          ],
+        };
+      } else {
+        throw new Error(result.error || 'Failed to list therapists');
+      }
+    } catch (error: any) {
       return {
         content: [
           {
             type: 'text',
-            text: 'You have no upcoming appointments.',
+            text: `Error: ${error.message}`,
           },
         ],
       };
     }
-
-    const appointmentList = appointments
-      .map(
-        (apt) =>
-          `- ${new Date(apt.date).toLocaleString()} with ${apt.therapist} (${apt.status})`,
-      )
-      .join('\n');
-
-    return {
-      content: [
-        {
-          type: 'text',
-          text: `Your upcoming appointments:\n${appointmentList}`,
-        },
-      ],
-    };
   },
 );
 
-// Tool to cancel an appointment
 server.registerTool(
-  'cancel_appointment',
+  'book-appointment',
+  {
+    title: 'Book Appointment',
+    description: 'Book an appointment with a therapist',
+    inputSchema: z.object({
+      apiKey: z.string().describe('API key for authentication'),
+      jwtToken: z.string().describe('JWT token for patient authentication'),
+      therapistId: z.string().describe('ID of the therapist'),
+      appointmentDate: z
+        .string()
+        .describe('Date and time for the appointment (ISO format)'),
+      duration: z
+        .number()
+        .min(15)
+        .max(180)
+        .describe('Duration in minutes (15-180)'),
+      notes: z
+        .string()
+        .optional()
+        .describe('Optional notes for the appointment'),
+    }).shape,
+  },
+  async (args) => {
+    try {
+      // Validate API key
+      if (!validateApiKey(args.apiKey)) {
+        throw new Error('Invalid API key');
+      }
+
+      // Call NestJS endpoint
+      const result = await callNestjsEndpoint(
+        'book-appointment',
+        {
+          therapistId: args.therapistId,
+          appointmentDate: args.appointmentDate,
+          duration: args.duration,
+          notes: args.notes,
+        },
+        {
+          Authorization: `Bearer ${args.jwtToken}`,
+        },
+      );
+
+      if (result.success) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                result.formattedResponse || 'Appointment booked successfully!',
+            },
+          ],
+        };
+      } else {
+        throw new Error(result.error || 'Failed to book appointment');
+      }
+    } catch (error: any) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error: ${error.message}`,
+          },
+        ],
+      };
+    }
+  },
+);
+
+server.registerTool(
+  'list-appointments',
+  {
+    title: 'List Patient Appointments',
+    description:
+      'Get a list of all upcoming appointments for the authenticated patient',
+    inputSchema: z.object({
+      apiKey: z.string().describe('API key for authentication'),
+      jwtToken: z.string().describe('JWT token for patient authentication'),
+    }).shape,
+  },
+  async (args) => {
+    try {
+      // Validate API key
+      if (!validateApiKey(args.apiKey)) {
+        throw new Error('Invalid API key');
+      }
+
+      // Call NestJS endpoint
+      const result = await callNestjsEndpoint(
+        'list-appointments',
+        {},
+        {
+          Authorization: `Bearer ${args.jwtToken}`,
+        },
+      );
+
+      if (result.success) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                result.formattedResponse ||
+                `Found ${result.data.length} appointments`,
+            },
+          ],
+        };
+      } else {
+        throw new Error(result.error || 'Failed to list appointments');
+      }
+    } catch (error: any) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error: ${error.message}`,
+          },
+        ],
+      };
+    }
+  },
+);
+
+server.registerTool(
+  'cancel-appointment',
   {
     title: 'Cancel Appointment',
-    description:
-      'Cancel an existing appointment with optional cancellation reason',
-    inputSchema: CancelAppointmentSchema.shape,
+    description: 'Cancel an existing appointment',
+    inputSchema: z.object({
+      apiKey: z.string().describe('API key for authentication'),
+      jwtToken: z.string().describe('JWT token for patient authentication'),
+      appointmentId: z.string().describe('ID of the appointment to cancel'),
+      cancellationReason: z
+        .string()
+        .optional()
+        .describe('Optional reason for cancellation'),
+    }).shape,
   },
-  (args) => {
-    const { appointmentId, cancellationReason } = args;
-    // In a real implementation, this would update your database
-    return {
-      content: [
+  async (args) => {
+    try {
+      // Validate API key
+      if (!validateApiKey(args.apiKey)) {
+        throw new Error('Invalid API key');
+      }
+
+      // Call NestJS endpoint
+      const result = await callNestjsEndpoint(
+        'cancel-appointment',
         {
-          type: 'text',
-          text: `Appointment ${appointmentId} cancelled successfully.${cancellationReason ? ` Reason: ${cancellationReason}` : ''}`,
+          appointmentId: args.appointmentId,
+          cancellationReason: args.cancellationReason,
         },
-      ],
-    };
+        {
+          Authorization: `Bearer ${args.jwtToken}`,
+        },
+      );
+
+      if (result.success) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                result.formattedResponse ||
+                'Appointment cancelled successfully!',
+            },
+          ],
+        };
+      } else {
+        throw new Error(result.error || 'Failed to cancel appointment');
+      }
+    } catch (error: any) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error: ${error.message}`,
+          },
+        ],
+      };
+    }
   },
 );
 
-// Tool to get patient profile
 server.registerTool(
-  'get_profile',
+  'get-profile',
   {
     title: 'Get Patient Profile',
-    description: 'Retrieve the profile information for a specific patient',
-    inputSchema: GetProfileSchema.shape,
+    description: 'Get the authenticated patient profile information',
+    inputSchema: z.object({
+      apiKey: z.string().describe('API key for authentication'),
+      jwtToken: z.string().describe('JWT token for patient authentication'),
+    }).shape,
   },
-  () => {
-    // const { patientId } = args;
-    // In a real implementation, this would fetch from your database
-    const profile: PatientProfile = {
-      firstName: 'John',
-      lastName: 'Doe',
-      email: 'john.doe@example.com',
-      phone: '+1234567890',
-      address: '123 Main St, City, State',
-    };
+  async (args) => {
+    try {
+      // Validate API key
+      if (!validateApiKey(args.apiKey)) {
+        throw new Error('Invalid API key');
+      }
 
-    return {
-      content: [
+      // Call NestJS endpoint
+      const result = await callNestjsEndpoint(
+        'get-profile',
+        {},
         {
-          type: 'text',
-          text: `Patient Profile:\n- Name: ${profile.firstName} ${profile.lastName}\n- Email: ${profile.email}\n- Phone: ${profile.phone}\n- Address: ${profile.address}`,
+          Authorization: `Bearer ${args.jwtToken}`,
         },
-      ],
-    };
+      );
+
+      if (result.success) {
+        return {
+          content: [
+            {
+              type: 'text',
+              text:
+                result.formattedResponse || 'Profile retrieved successfully!',
+            },
+          ],
+        };
+      } else {
+        throw new Error(result.error || 'Failed to get profile');
+      }
+    } catch (error: any) {
+      return {
+        content: [
+          {
+            type: 'text',
+            text: `Error: ${error.message}`,
+          },
+        ],
+      };
+    }
   },
 );
 
 // Start the server
-async function startServer(): Promise<void> {
+async function main() {
   try {
+    console.log('Starting Healthcare MCP Server...');
+    console.log(`NestJS Backend URL: ${NESTJS_BASE_URL}`);
+    console.log('Available tools:');
+    console.log('- list-therapists');
+    console.log('- book-appointment');
+    console.log('- list-appointments');
+    console.log('- cancel-appointment');
+    console.log('- get-profile');
+
     const transport = new StdioServerTransport();
     await server.connect(transport);
-
-    console.log('🚀 Healthcare MCP Server running...');
-    console.log('Available tools:');
-    console.log('- list_therapists');
-    console.log('- book_appointment');
-    console.log('- list_appointments');
-    console.log('- cancel_appointment');
-    console.log('- get_profile');
+    console.log('MCP Server started successfully!');
   } catch (error) {
-    console.error('❌ Failed to start MCP server:', error);
+    console.error('Failed to start MCP server:', error);
     process.exit(1);
   }
 }
 
-// Handle graceful shutdown
-process.on('SIGINT', () => {
-  (async () => {
-    console.log('\n🛑 Shutting down MCP server...');
-    try {
-      await server.close();
-      console.log('✅ MCP server shut down gracefully');
-      process.exit(0);
-    } catch (error) {
-      console.error('❌ Error during shutdown:', error);
-      process.exit(1);
-    }
-  })().catch((error) => {
-    console.error('❌ Unhandled error during shutdown:', error);
-    process.exit(1);
-  });
-});
-
-process.on('SIGTERM', () => {
-  (async () => {
-    console.log('\n🛑 Received SIGTERM, shutting down MCP server...');
-    try {
-      await server.close();
-      console.log('✅ MCP server shut down gracefully');
-      process.exit(0);
-    } catch (error) {
-      console.error('❌ Error during shutdown:', error);
-      process.exit(1);
-    }
-  })().catch((error) => {
-    console.error('❌ Unhandled error during SIGTERM shutdown:', error);
-    process.exit(1);
-  });
-});
-
-// Start the server
-startServer();
+main().catch(console.error);

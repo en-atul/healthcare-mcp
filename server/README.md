@@ -354,3 +354,17 @@ Assistant: "Here are your upcoming appointments..."
 - ✅ **Context awareness** - Understands user intent from various phrasings
 - ✅ **Professional responses** - Human-like conversation flow
 - ✅ **Error handling** - Gracefully handles unclear requests
+
+
+{
+  "mcpServers": {
+    "healthcare": {
+      "command": "ts-node",
+      "args": ["src/mcp/mcp-server.ts"],
+      "env": {
+        "MCP_API_KEY": "your-secret-mcp-api-key-change-in-production",
+        "NESTJS_BASE_URL": "http://localhost:3000"  // ← Main Server (NestJS) URL
+      }
+    }
+  }
+}

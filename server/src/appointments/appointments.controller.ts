@@ -10,7 +10,10 @@ import {
   Request,
 } from '@nestjs/common';
 import { AppointmentsService } from './appointments.service';
-import { CreateAppointmentDto, UpdateAppointmentDto } from './dto/appointment.dto';
+import {
+  CreateAppointmentDto,
+  UpdateAppointmentDto,
+} from './dto/appointment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('appointments')
@@ -19,8 +22,11 @@ export class AppointmentsController {
   constructor(private readonly appointmentsService: AppointmentsService) {}
 
   @Post()
-  async create(@Body() createAppointmentDto: CreateAppointmentDto, @Request() req) {
-    const patientId = req.user.userId;
+  async create(
+    @Body() createAppointmentDto: CreateAppointmentDto,
+    @Request() req,
+  ) {
+    const patientId = req.user.sub;
     return this.appointmentsService.create(createAppointmentDto, patientId);
   }
 
@@ -31,7 +37,7 @@ export class AppointmentsController {
 
   @Get('my-appointments')
   async findMyAppointments(@Request() req) {
-    const patientId = req.user.userId;
+    const patientId = req.user.sub;
     return this.appointmentsService.findByPatientId(patientId);
   }
 
@@ -46,7 +52,10 @@ export class AppointmentsController {
   }
 
   @Patch(':id')
-  async update(@Param('id') id: string, @Body() updateAppointmentDto: UpdateAppointmentDto) {
+  async update(
+    @Param('id') id: string,
+    @Body() updateAppointmentDto: UpdateAppointmentDto,
+  ) {
     return this.appointmentsService.update(id, updateAppointmentDto);
   }
 

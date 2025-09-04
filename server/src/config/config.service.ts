@@ -7,7 +7,10 @@ export class ConfigService {
 
   // Database configuration
   get databaseUrl(): string {
-    return this.configService.get<string>('database.uri') || 'mongodb://mongoadmin:secret@localhost:27017/healthcare?authSource=admin';
+    return (
+      this.configService.get<string>('database.uri') ||
+      'mongodb://mongoadmin:secret@localhost:27017/healthcare?authSource=admin'
+    );
   }
 
   get databaseName(): string {
@@ -32,7 +35,10 @@ export class ConfigService {
 
   // JWT configuration
   get jwtSecret(): string {
-    return this.configService.get<string>('jwt.secret') || 'your-super-secret-jwt-key-change-in-production';
+    return (
+      this.configService.get<string>('jwt.secret') ||
+      'your-super-secret-jwt-key-change-in-production'
+    );
   }
 
   get jwtExpiresIn(): string {
@@ -40,7 +46,10 @@ export class ConfigService {
   }
 
   get jwtRefreshSecret(): string {
-    return this.configService.get<string>('jwt.refreshSecret') || 'your-refresh-secret-key';
+    return (
+      this.configService.get<string>('jwt.refreshSecret') ||
+      'your-refresh-secret-key'
+    );
   }
 
   get jwtRefreshExpiresIn(): string {
@@ -70,15 +79,36 @@ export class ConfigService {
   }
 
   get mcpServerArgs(): string[] {
-    return this.configService.get<string[]>('mcp.serverArgs') || ['src/mcp/mcp-server.ts'];
+    return (
+      this.configService.get<string[]>('mcp.serverArgs') || [
+        'src/mcp/mcp-server.ts',
+      ]
+    );
   }
 
   get mcpServerPath(): string {
-    return this.configService.get<string>('mcp.serverPath') || 'src/mcp/mcp-server.ts';
+    return (
+      this.configService.get<string>('mcp.serverPath') ||
+      'src/mcp/mcp-server.ts'
+    );
   }
 
   get mcpConnectionTimeout(): number {
     return this.configService.get<number>('mcp.connectionTimeout') || 10000;
+  }
+
+  get mcpApiKey(): string {
+    return (
+      this.configService.get<string>('mcp.apiKey') ||
+      'your-secret-mcp-api-key-change-in-production'
+    );
+  }
+
+  get nestjsBaseUrl(): string {
+    return (
+      this.configService.get<string>('nestjs.baseUrl') ||
+      'http://localhost:3001'
+    );
   }
 
   // CORS configuration
@@ -91,7 +121,15 @@ export class ConfigService {
   }
 
   get corsMethods(): string[] {
-    return this.configService.get<string[]>('cors.methods') || ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'];
+    return (
+      this.configService.get<string[]>('cors.methods') || [
+        'GET',
+        'POST',
+        'PUT',
+        'PATCH',
+        'DELETE',
+      ]
+    );
   }
 
   // Security configuration
@@ -121,7 +159,9 @@ export class ConfigService {
   }
 
   get logFilePath(): string {
-    return this.configService.get<string>('logging.logFilePath') || './logs/app.log';
+    return (
+      this.configService.get<string>('logging.logFilePath') || './logs/app.log'
+    );
   }
 
   // App configuration
@@ -143,7 +183,7 @@ export class ConfigService {
 
   // Port configuration
   get port(): number {
-    return this.configService.get<number>('port') || 3000;
+    return this.configService.get<number>('port') || 3001;
   }
 
   // Helper method to get nested config values

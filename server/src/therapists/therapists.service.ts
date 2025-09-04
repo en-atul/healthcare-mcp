@@ -6,7 +6,8 @@ import { Therapist, TherapistDocument } from './schemas/therapist.schema';
 @Injectable()
 export class TherapistsService {
   constructor(
-    @InjectModel(Therapist.name) private therapistModel: Model<TherapistDocument>,
+    @InjectModel(Therapist.name)
+    private therapistModel: Model<TherapistDocument>,
   ) {}
 
   async findById(id: string): Promise<Therapist> {
@@ -76,10 +77,10 @@ export class TherapistsService {
     ];
 
     for (const therapistData of therapistsData) {
-      const existingTherapist = await this.therapistModel.findOne({ 
-        email: therapistData.email 
+      const existingTherapist = await this.therapistModel.findOne({
+        email: therapistData.email,
       });
-      
+
       if (!existingTherapist) {
         await this.therapistModel.create(therapistData);
       }

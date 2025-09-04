@@ -1,29 +1,15 @@
 import { Injectable, OnModuleInit, OnModuleDestroy } from '@nestjs/common';
-import { ConfigService } from '../config/config.service';
-import { Client } from '@modelcontextprotocol/sdk/client/index.js';
-import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
+import { McpServerService } from './mcp-server.service';
 
 @Injectable()
 export class McpClientService implements OnModuleInit, OnModuleDestroy {
-  private client: Client;
+  constructor(private readonly mcpServerService: McpServerService) {}
 
-  constructor(private readonly configService: ConfigService) {}
-
-  async onModuleInit() {
+  onModuleInit() {
     try {
-      const transport = new StdioClientTransport({
-        command: this.configService.mcpServerCommand,
-        args: this.configService.mcpServerArgs,
-      });
-
-      this.client = new Client({
-        name: 'healthcare-mcp-client',
-        version: '1.0.0',
-      });
-      await this.client.connect(transport);
-      console.log('✅ MCP client connected to healthcare server');
+      console.log('✅ MCP client service initialized');
     } catch (error) {
-      console.error('❌ Failed to connect to MCP server:', error);
+      console.error('❌ Failed to initialize MCP client service:', error);
       throw error;
     }
   }
@@ -33,30 +19,53 @@ export class McpClientService implements OnModuleInit, OnModuleDestroy {
     args: Record<string, unknown>,
   ): Promise<unknown> {
     try {
-      if (!this.client) {
-        throw new Error('MCP client not connected');
-      }
+      // Map MCP tool names to MCP server service methods
+      switch (tool) {
+        case 'list_therapists':
+          return await this.mcpServerService.listTherapists();
 
-      // Use the correct MCP SDK method for calling tools
-      const result = await this.client.callTool({
-        name: tool,
-        arguments: args,
-      });
-      return result;
-    } catch (error) {
-      console.error(`Error calling MCP tool ${tool}:`, error);
+        case 'book_appointment':
+          const { therapistId, appointmentDate, duration, notes } = args;
+          return await this.mcpServerService.bookAppointment(
+            args.jwtToken as string,
+            therapistId as string,
+            appointmentDate as string,
+            duration as number,
+            notes as string | undefined,
+          );
+
+        case 'list_appointments':
+          return await this.mcpServerService.listAppointments(
+            args.jwtToken as string,
+          );
+
+        case 'cancel_appointment':
+          const { appointmentId, cancellationReason } = args;
+          return await this.mcpServerService.cancelAppointment(
+            args.jwtToken as string,
+            appointmentId as string,
+            cancellationReason as string | undefined,
+          );
+
+        case 'get_profile':
+          return await this.mcpServerService.getProfile(
+            args.jwtToken as string,
+          );
+
+        default:
+          throw new Error(`Unknown tool: ${tool}`);
+      }
+    } catch (error: any) {
+      console.error(`Error calling MCP tool ${tool}:`, error.message);
       throw error;
     }
   }
 
-  async onModuleDestroy() {
+  onModuleDestroy() {
     try {
-      if (this.client) {
-        await this.client.close();
-        console.log('✅ MCP client disconnected');
-      }
+      console.log('✅ MCP client service destroyed');
     } catch (error) {
-      console.error('Error disconnecting MCP client:', error);
+      console.error('Error destroying MCP client service:', error);
     }
   }
 
@@ -66,12 +75,14 @@ export class McpClientService implements OnModuleInit, OnModuleDestroy {
   }
 
   async bookAppointment(
+    jwtToken: string,
     therapistId: string,
     appointmentDate: string,
     duration: number,
     notes?: string,
   ): Promise<unknown> {
     return this.callTool('book_appointment', {
+      jwtToken,
       therapistId,
       appointmentDate,
       duration,
@@ -79,21 +90,23 @@ export class McpClientService implements OnModuleInit, OnModuleDestroy {
     });
   }
 
-  async listAppointments(patientId: string): Promise<unknown> {
-    return this.callTool('list_appointments', { patientId });
+  async listAppointments(jwtToken: string): Promise<unknown> {
+    return this.callTool('list_appointments', { jwtToken });
   }
 
   async cancelAppointment(
+    jwtToken: string,
     appointmentId: string,
     cancellationReason?: string,
   ): Promise<unknown> {
     return this.callTool('cancel_appointment', {
+      jwtToken,
       appointmentId,
       cancellationReason,
     });
   }
 
-  async getProfile(patientId: string): Promise<unknown> {
-    return this.callTool('get_profile', { patientId });
+  async getProfile(jwtToken: string): Promise<unknown> {
+    return this.callTool('get_profile', { jwtToken });
   }
 }
