@@ -146,6 +146,7 @@ class ApiClient {
     return {
       response: response.data.answer,
       type: response.data.action,
+      action: response.data.action,
       data: response.data.rawData || response.data.actionResult,
     };
   }

@@ -278,6 +278,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       };
       
       get().addChatMessage(assistantMessage);
+
+      // Check if the response contains appointment-related actions
+      if ((data as any).action === 'book_appointment' || (data as any).action === 'cancel_appointment') {
+        console.log('Appointment action detected:', (data as any).action, '- Re-fetching appointments');
+        // Re-fetch appointments to update the appointments panel
+        get().fetchAppointments().catch((error) => {
+          console.error('Failed to re-fetch appointments after action:', error);
+        });
+      }
     } catch (error) {
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
