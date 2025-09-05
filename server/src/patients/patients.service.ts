@@ -18,7 +18,9 @@ export class PatientsService {
   }
 
   async findByEmail(email: string): Promise<Patient> {
-    const patient = await this.patientModel.findOne({ email }).select('-password');
+    const patient = await this.patientModel
+      .findOne({ email })
+      .select('-password');
     if (!patient) {
       throw new NotFoundException('Patient not found');
     }

@@ -4,7 +4,7 @@ import { z } from 'zod';
 import axios from 'axios';
 
 // Configuration
-const NESTJS_BASE_URL = process.env.NESTJS_BASE_URL || 'http://localhost:3000';
+const NESTJS_BASE_URL = process.env.NESTJS_BASE_URL || 'http://localhost:3001';
 const MCP_API_KEY =
   process.env.MCP_API_KEY || 'your-secret-mcp-api-key-change-in-production';
 
@@ -14,12 +14,21 @@ const server = new McpServer({
   version: '1.0.0',
 });
 
+// Define response types
+interface McpResponse {
+  success: boolean;
+  error?: string;
+  message?: string;
+  data?: unknown[];
+  formattedResponse?: string;
+}
+
 // Helper function to make HTTP calls to NestJS backend
 async function callNestjsEndpoint(
   endpoint: string,
-  data: any = {},
-  headers: any = {},
-) {
+  data: Record<string, unknown> = {},
+  headers: Record<string, unknown> = {},
+): Promise<McpResponse> {
   try {
     const response = await axios.post(
       `${NESTJS_BASE_URL}/mcp/${endpoint}`,
@@ -32,14 +41,15 @@ async function callNestjsEndpoint(
         },
       },
     );
-    return response.data;
-  } catch (error: any) {
+
+    return response.data as McpResponse;
+  } catch (error) {
     console.error(
       `Error calling ${endpoint}:`,
-      error.response?.data || error.message,
+      error instanceof Error ? error.message : 'Unknown error',
     );
     throw new Error(
-      `Failed to call ${endpoint}: ${error.response?.data?.message || error.message}`,
+      `Failed to call ${endpoint}: ${error instanceof Error ? error.message : 'Unknown error'}`,
     );
   }
 }
@@ -77,19 +87,19 @@ server.registerTool(
               type: 'text',
               text:
                 result.formattedResponse ||
-                `Found ${result.data.length} therapists`,
+                `Found ${result.data?.length || 0} therapists`,
             },
           ],
         };
       } else {
         throw new Error(result.error || 'Failed to list therapists');
       }
-    } catch (error: any) {
+    } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Error: ${error.message}`,
+            text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
           },
         ],
       };
@@ -154,12 +164,12 @@ server.registerTool(
       } else {
         throw new Error(result.error || 'Failed to book appointment');
       }
-    } catch (error: any) {
+    } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Error: ${error.message}`,
+            text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
           },
         ],
       };
@@ -201,19 +211,19 @@ server.registerTool(
               type: 'text',
               text:
                 result.formattedResponse ||
-                `Found ${result.data.length} appointments`,
+                `Found ${result.data?.length || 0} appointments`,
             },
           ],
         };
       } else {
         throw new Error(result.error || 'Failed to list appointments');
       }
-    } catch (error: any) {
+    } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Error: ${error.message}`,
+            text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
           },
         ],
       };
@@ -269,12 +279,12 @@ server.registerTool(
       } else {
         throw new Error(result.error || 'Failed to cancel appointment');
       }
-    } catch (error: any) {
+    } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Error: ${error.message}`,
+            text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
           },
         ],
       };
@@ -321,12 +331,12 @@ server.registerTool(
       } else {
         throw new Error(result.error || 'Failed to get profile');
       }
-    } catch (error: any) {
+    } catch (error) {
       return {
         content: [
           {
             type: 'text',
-            text: `Error: ${error.message}`,
+            text: `Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
           },
         ],
       };

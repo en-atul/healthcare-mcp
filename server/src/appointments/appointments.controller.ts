@@ -7,7 +7,6 @@ import {
   Param,
   Delete,
   UseGuards,
-  Request,
 } from '@nestjs/common';
 import { AppointmentsService } from './appointments.service';
 import {
@@ -15,6 +14,7 @@ import {
   UpdateAppointmentDto,
 } from './dto/appointment.dto';
 import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
+import { CurrentPatientId } from '../common';
 
 @Controller('appointments')
 @UseGuards(JwtAuthGuard)
@@ -24,9 +24,8 @@ export class AppointmentsController {
   @Post()
   async create(
     @Body() createAppointmentDto: CreateAppointmentDto,
-    @Request() req,
+    @CurrentPatientId() patientId: string,
   ) {
-    const patientId = req.user.sub;
     return this.appointmentsService.create(createAppointmentDto, patientId);
   }
 
@@ -36,8 +35,7 @@ export class AppointmentsController {
   }
 
   @Get('my-appointments')
-  async findMyAppointments(@Request() req) {
-    const patientId = req.user.sub;
+  async findMyAppointments(@CurrentPatientId() patientId: string) {
     return this.appointmentsService.findByPatientId(patientId);
   }
 

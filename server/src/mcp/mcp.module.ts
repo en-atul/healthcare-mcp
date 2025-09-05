@@ -9,12 +9,7 @@ import { PatientsModule } from '../patients/patients.module';
 import { AuthModule } from '../auth/auth.module';
 
 @Module({
-  imports: [
-    AppointmentsModule,
-    TherapistsModule,
-    PatientsModule,
-    AuthModule,
-  ],
+  imports: [AppointmentsModule, TherapistsModule, PatientsModule, AuthModule],
   providers: [McpClientService, McpServerService, LlmIntegrationService],
   controllers: [McpController],
   exports: [McpClientService, McpServerService],

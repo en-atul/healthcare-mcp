@@ -19,7 +19,10 @@ export class Appointment {
   @Prop({ required: true })
   duration: number; // in minutes
 
-  @Prop({ required: true, enum: ['scheduled', 'confirmed', 'completed', 'cancelled'] })
+  @Prop({
+    required: true,
+    enum: ['scheduled', 'confirmed', 'completed', 'cancelled'],
+  })
   status: string;
 
   @Prop()

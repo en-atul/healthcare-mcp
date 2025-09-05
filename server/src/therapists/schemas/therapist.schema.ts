@@ -19,6 +19,12 @@ export class Therapist {
   @Prop({ required: true })
   specialization: string;
 
+  @Prop({ required: true })
+  experience: number;
+
+  @Prop({ type: Number, min: 1, max: 5 })
+  rating?: number;
+
   @Prop()
   phone: string;
 

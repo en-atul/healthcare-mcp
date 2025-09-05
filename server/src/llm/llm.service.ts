@@ -57,7 +57,7 @@ logged in user's data → user's id=${user.sub} and user's role=${user.role}
         throw new Error('No response from OpenAI');
       }
 
-      return JSON.parse(content);
+      return JSON.parse(content) as Record<string, unknown>;
     } catch (error) {
       console.error('Error planning tool call:', error);
       throw new Error('Failed to understand user request');
@@ -85,8 +85,23 @@ logged in user's data → user's id=${user.sub} and user's role=${user.role}
     } catch (error) {
       console.error('Error formatting result:', error);
       // Fallback to raw result if formatting fails
-      if (rawResult?.content?.[0]?.text) {
-        return rawResult.content[0].text;
+      if (
+        rawResult &&
+        typeof rawResult === 'object' &&
+        'content' in rawResult
+      ) {
+        const resultWithContent = rawResult as { content: unknown[] };
+        if (
+          Array.isArray(resultWithContent.content) &&
+          resultWithContent.content[0]
+        ) {
+          const firstContent = resultWithContent.content[0] as {
+            text?: string;
+          };
+          if (firstContent.text) {
+            return firstContent.text;
+          }
+        }
       }
       return 'I have completed your request.';
     }

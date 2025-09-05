@@ -113,11 +113,16 @@ export class ConfigService {
 
   // ChromaDB configuration
   get chromaUrl(): string {
-    return this.configService.get<string>('chroma.url') || 'http://localhost:8000';
+    return (
+      this.configService.get<string>('chroma.url') || 'http://localhost:8000'
+    );
   }
 
   get chromaCollectionName(): string {
-    return this.configService.get<string>('chroma.collectionName') || 'healthcare_conversations';
+    return (
+      this.configService.get<string>('chroma.collectionName') ||
+      'healthcare_conversations'
+    );
   }
 
   // CORS configuration
@@ -193,6 +198,13 @@ export class ConfigService {
   // Port configuration
   get port(): number {
     return this.configService.get<number>('port') || 3001;
+  }
+
+  get chromaHost(): string {
+    return this.configService.get<string>('chroma.host') || 'localhost';
+  }
+  get chromaPort(): number {
+    return this.configService.get<number>('chroma.port') || 8001;
   }
 
   // Helper method to get nested config values
