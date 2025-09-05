@@ -14,7 +14,6 @@ class ApiClient {
       },
     });
 
-    // Request interceptor to add auth token
     this.client.interceptors.request.use(
       (config) => {
         const token = this.getToken();
@@ -28,12 +27,10 @@ class ApiClient {
       },
     );
 
-    // Response interceptor to handle errors
     this.client.interceptors.response.use(
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
-          // Handle unauthorized access
           this.clearToken();
           window.location.href = '/login';
         }

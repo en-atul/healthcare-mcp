@@ -60,7 +60,7 @@ export function AppointmentModal() {
       toast.success('Appointment booked successfully!');
       setAppointmentModalOpen(false);
       resetForm();
-    } catch (error) {
+    } catch {
       toast.error('Failed to book appointment');
     } finally {
       setIsBooking(false);

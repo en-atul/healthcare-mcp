@@ -20,6 +20,7 @@
     "test:e2e": "jest --config ./test/jest-e2e.json",
     "seed:therapists": "ts-node src/scripts/seed-therapists.ts",
     "seed:patients": "ts-node src/scripts/seed-patients.ts",
+    "clear:databases": "ts-node src/scripts/clear-databases.ts",
     "mcp:server": "ts-node src/mcp/mcp-server.ts",
     "test:mcp:http": "node test-mcp-http.js",
     "test:rag": "node test-rag.js",

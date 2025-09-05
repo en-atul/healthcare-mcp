@@ -160,7 +160,7 @@ export class ChatController {
           'data' in actionResult
             ? (actionResult as { data: unknown }).data
             : null,
-        context: ragResponse.context as Record<string, unknown> | undefined,
+        context: ragResponse.context,
       };
     } catch (error) {
       console.error('❌ Error in RAG chat pipeline:', error);

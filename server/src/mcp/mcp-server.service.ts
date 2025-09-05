@@ -29,7 +29,6 @@ export class McpServerService {
     console.log('- get-profile: Get patient profile (requires JWT)');
   }
 
-  // Helper method to extract patient ID from JWT token
   private extractPatientIdFromToken(token: string): string {
     try {
       const payload = this.jwtService.verify(token) satisfies {
@@ -45,26 +44,47 @@ export class McpServerService {
         );
       }
       return payload.sub;
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    } catch (error: any) {
+    } catch {
       throw new UnauthorizedException('Invalid or expired JWT token');
     }
   }
 
-  // Tool methods that can be called by LLM through NestJS backend
   async listTherapists() {
     try {
       const therapists = await this.therapistsService.findAll();
+
+      const cleanTherapists = therapists.map((t) => ({
+        firstName: t.firstName,
+        lastName: t.lastName,
+        specialization: t.specialization,
+        experience: t.experience,
+        rating: t.rating,
+        email: t.email,
+      }));
+
+      const htmlResponse = `
+        <h3>Available Therapists</h3>
+        <ul>
+          ${therapists
+            .map(
+              (t) => `
+            <li>
+              <strong>Dr. ${t.firstName} ${t.lastName}</strong><br>
+              <em>${t.specialization}</em><br>
+              ${t.experience} years experience • ⭐ ${t.rating}/5<br>
+              📧 ${t.email}
+            </li>
+          `,
+            )
+            .join('')}
+        </ul>
+      `;
+
       return {
         success: true,
-        data: therapists,
+        data: cleanTherapists,
         message: `Found ${therapists.length} therapists`,
-        formattedResponse: therapists
-          .map(
-            (t) =>
-              `Dr. ${t.firstName} ${t.lastName} - ${t.specialization} (${t.email})`,
-          )
-          .join('\n'),
+        formattedResponse: htmlResponse,
       };
     } catch (error) {
       return {
@@ -82,10 +102,8 @@ export class McpServerService {
     notes?: string,
   ) {
     try {
-      // Extract patient ID from JWT token
       const patientId = this.extractPatientIdFromToken(jwtToken);
 
-      // Create the appointment
       const appointment = await this.appointmentsService.create(
         {
           therapistId,
@@ -96,11 +114,35 @@ export class McpServerService {
         patientId,
       );
 
+      const therapist = await this.therapistsService.findById(therapistId);
+
+      const cleanAppointment = {
+        date: appointment.appointmentDate,
+        duration: appointment.duration,
+        status: appointment.status,
+        therapistName: therapist
+          ? `Dr. ${therapist.firstName} ${therapist.lastName}`
+          : 'Unknown Therapist',
+        notes: appointment.notes,
+      };
+
+      const htmlResponse = `
+        <div class="appointment-confirmation">
+          <h3>✅ Appointment Booked Successfully!</h3>
+          <div class="appointment-details">
+            <p><strong>Date:</strong> ${new Date(appointmentDate).toLocaleString()}</p>
+            <p><strong>Duration:</strong> ${duration} minutes</p>
+            <p><strong>Therapist:</strong> ${therapist ? `Dr. ${therapist.firstName} ${therapist.lastName}` : 'Unknown'}</p>
+            ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
+          </div>
+        </div>
+      `;
+
       return {
         success: true,
-        data: appointment,
+        data: cleanAppointment,
         message: 'Appointment booked successfully',
-        formattedResponse: `Appointment booked successfully!\n\nDetails:\n- Date: ${new Date(appointmentDate).toLocaleString()}\n- Duration: ${duration} minutes\n- Appointment ID: ${appointment._id?.toString() || 'N/A'}`,
+        formattedResponse: htmlResponse,
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) {
@@ -118,38 +160,73 @@ export class McpServerService {
 
   async listAppointments(jwtToken: string) {
     try {
-      // Extract patient ID from JWT token
       const patientId = this.extractPatientIdFromToken(jwtToken);
 
-      // Get patient's appointments
       const appointments =
         await this.appointmentsService.findByPatientId(patientId);
 
       if (appointments.length === 0) {
         return {
           success: true,
-          data: appointments,
+          data: [],
           message: 'No appointments found',
-          formattedResponse: 'You have no upcoming appointments.',
+          formattedResponse: '<p>You have no upcoming appointments.</p>',
         };
       }
 
-      const appointmentsList = appointments
-        .map((apt) => {
-          const therapist = apt.therapistId as unknown as {
-            firstName: string;
-            lastName: string;
-            [key: string]: unknown;
-          };
-          return `- ${new Date(apt.appointmentDate).toLocaleString()} with Dr. ${therapist.firstName} ${therapist.lastName} (${apt.status})`;
-        })
-        .join('\n');
+      const cleanAppointments = appointments.map((apt) => {
+        const therapist = apt.therapistId as unknown as {
+          firstName: string;
+          lastName: string;
+          [key: string]: unknown;
+        };
+        return {
+          date: apt.appointmentDate,
+          duration: apt.duration,
+          status: apt.status,
+          therapistName: `Dr. ${therapist.firstName} ${therapist.lastName}`,
+          notes: apt.notes,
+        };
+      });
+
+      const htmlResponse = `
+        <h3>Your Appointments</h3>
+        <div class="appointments-list">
+          ${appointments
+            .map((apt, index) => {
+              const therapist = apt.therapistId as unknown as {
+                firstName: string;
+                lastName: string;
+                [key: string]: unknown;
+              };
+              const statusClass =
+                apt.status === 'scheduled'
+                  ? 'status-scheduled'
+                  : apt.status === 'cancelled'
+                    ? 'status-cancelled'
+                    : apt.status === 'completed'
+                      ? 'status-completed'
+                      : 'status-default';
+              return `
+              <div class="appointment-item">
+                <h4>Appointment ${index + 1}</h4>
+                <p><strong>Date:</strong> ${new Date(apt.appointmentDate).toLocaleString()}</p>
+                <p><strong>Therapist:</strong> Dr. ${therapist.firstName} ${therapist.lastName}</p>
+                <p><strong>Duration:</strong> ${apt.duration} minutes</p>
+                <p><strong>Status:</strong> <span class="${statusClass}">${apt.status}</span></p>
+                ${apt.notes ? `<p><strong>Notes:</strong> ${apt.notes}</p>` : ''}
+              </div>
+            `;
+            })
+            .join('')}
+        </div>
+      `;
 
       return {
         success: true,
-        data: appointments,
+        data: cleanAppointments,
         message: `Found ${appointments.length} appointments`,
-        formattedResponse: `Your upcoming appointments:\n${appointmentsList}`,
+        formattedResponse: htmlResponse,
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) {
@@ -171,26 +248,40 @@ export class McpServerService {
     cancellationReason?: string,
   ) {
     try {
-      // Extract patient ID from JWT token
       const patientId = this.extractPatientIdFromToken(jwtToken);
 
-      // Get the appointment to verify ownership
       const appointment = await this.appointmentsService.findOne(appointmentId);
 
       if (appointment.patientId._id.toString() !== patientId) {
         throw new Error('You can only cancel your own appointments');
       }
 
-      // Update appointment status to cancelled
       await this.appointmentsService.update(appointmentId, {
         status: 'cancelled',
         cancellationReason: cancellationReason || 'Cancelled by patient',
       });
 
+      const therapist = appointment.therapistId as unknown as {
+        firstName: string;
+        lastName: string;
+        [key: string]: unknown;
+      };
+
+      const htmlResponse = `
+        <div class="cancellation-confirmation">
+          <h3>❌ Appointment Cancelled Successfully</h3>
+          <div class="cancelled-appointment-details">
+            <p><strong>Date:</strong> ${new Date(appointment.appointmentDate).toLocaleString()}</p>
+            <p><strong>Therapist:</strong> Dr. ${therapist.firstName} ${therapist.lastName}</p>
+            <p><strong>Reason:</strong> ${cancellationReason || 'Cancelled by patient'}</p>
+          </div>
+        </div>
+      `;
+
       return {
         success: true,
         message: 'Appointment cancelled successfully',
-        formattedResponse: `Appointment cancelled successfully. Appointment ID: ${appointmentId}`,
+        formattedResponse: htmlResponse,
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) {
@@ -208,17 +299,37 @@ export class McpServerService {
 
   async getProfile(jwtToken: string) {
     try {
-      // Extract patient ID from JWT token
       const patientId = this.extractPatientIdFromToken(jwtToken);
 
-      // Get patient profile
       const patient = await this.patientsService.findById(patientId);
+
+      const cleanProfile = {
+        firstName: patient.firstName,
+        lastName: patient.lastName,
+        email: patient.email,
+        phone: patient.phone,
+        address: patient.address,
+        dateOfBirth: patient.dateOfBirth,
+      };
+
+      const htmlResponse = `
+        <div class="patient-profile">
+          <h3>👤 Patient Profile</h3>
+          <div class="profile-details">
+            <p><strong>Name:</strong> ${patient.firstName} ${patient.lastName}</p>
+            <p><strong>Email:</strong> ${patient.email}</p>
+            <p><strong>Phone:</strong> ${patient.phone || 'Not provided'}</p>
+            <p><strong>Address:</strong> ${patient.address || 'Not provided'}</p>
+            ${patient.dateOfBirth ? `<p><strong>Date of Birth:</strong> ${new Date(patient.dateOfBirth).toLocaleDateString()}</p>` : ''}
+          </div>
+        </div>
+      `;
 
       return {
         success: true,
-        data: patient,
+        data: cleanProfile,
         message: 'Profile retrieved successfully',
-        formattedResponse: `Patient Profile:\n- Name: ${patient.firstName} ${patient.lastName}\n- Email: ${patient.email}\n- Phone: ${patient.phone || 'Not provided'}\n- Address: ${patient.address || 'Not provided'}`,
+        formattedResponse: htmlResponse,
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) {
@@ -234,7 +345,6 @@ export class McpServerService {
     }
   }
 
-  // Method to get available tools for LLM
   getAvailableTools() {
     return [
       {

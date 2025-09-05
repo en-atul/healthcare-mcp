@@ -24,10 +24,8 @@ export default function Dashboard() {
     }
   }, [isAuthenticated, user, token, isHydrated, router]);
 
-  // Load initial data when user is authenticated
   useEffect(() => {
     if (isAuthenticated && user && token) {
-      // Load appointments and chat history
       fetchAppointments().catch((error) => {
         console.error('Failed to load appointments:', error);
       });

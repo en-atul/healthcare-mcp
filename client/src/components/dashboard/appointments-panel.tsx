@@ -29,7 +29,7 @@ export function AppointmentsPanel() {
     try {
       await cancelAppointment(appointmentId);
       toast.success('Appointment cancelled successfully');
-    } catch (error) {
+    } catch {
       toast.error('Failed to cancel appointment');
     }
   };

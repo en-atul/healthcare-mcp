@@ -6,7 +6,6 @@ export function useAuth() {
   const [isHydrated, setIsHydrated] = useState(false);
 
   useEffect(() => {
-    // Check if Zustand has rehydrated from localStorage
     const checkHydration = () => {
       const stored = localStorage.getItem('auth-storage');
       if (stored) {

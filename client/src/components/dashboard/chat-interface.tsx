@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { useAppStore } from '@/stores/app-store';
@@ -21,10 +21,7 @@ export function ChatInterface() {
   const {
     chatMessages,
     isChatLoading,
-    chatInput,
-    setChatInput,
     sendChatMessage,
-    addChatMessage,
     fetchChatHistory,
     loadMoreChatHistory,
     isChatHistoryLoading,
@@ -41,7 +38,6 @@ export function ChatInterface() {
     scrollToBottom();
   }, [chatMessages]);
 
-  // Load chat history on component mount
   useEffect(() => {
     if (user && chatMessages.length === 0) {
       console.log('Loading chat history for user:', user);
@@ -78,7 +74,6 @@ export function ChatInterface() {
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop } = e.currentTarget;
     
-    // Load more messages when scrolled to top
     if (scrollTop === 0 && hasMoreChatHistory && !isChatHistoryLoading) {
       loadMoreChatHistory();
     }
@@ -138,14 +133,12 @@ export function ChatInterface() {
       );
     }
 
-    // Use markdown for assistant messages, plain text for user messages
     if (message.role === 'assistant') {
       return (
         <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-em:text-foreground prose-li:text-foreground">
           <ReactMarkdown 
             remarkPlugins={[remarkGfm]}
             components={{
-              // Customize markdown components for better styling
               p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
               ul: ({ children }) => <ul className="mb-2 last:mb-0 pl-4">{children}</ul>,
               ol: ({ children }) => <ol className="mb-2 last:mb-0 pl-4">{children}</ol>,

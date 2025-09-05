@@ -34,17 +34,14 @@ export interface ChatMessage {
 }
 
 interface AppState {
-  // Appointments
   appointments: Appointment[];
   selectedAppointment: Appointment | null;
   isLoadingAppointments: boolean;
 
-  // Therapists
   therapists: Therapist[];
   selectedTherapist: Therapist | null;
   isLoadingTherapists: boolean;
 
-  // Chat
   chatMessages: ChatMessage[];
   isChatLoading: boolean;
   chatInput: string;
@@ -52,11 +49,9 @@ interface AppState {
   hasMoreChatHistory: boolean;
   chatPage: number;
 
-  // UI State
   isAppointmentModalOpen: boolean;
   isProfileModalOpen: boolean;
 
-  // Actions
   setAppointments: (appointments: Appointment[]) => void;
   addAppointment: (appointment: Appointment) => void;
   updateAppointment: (id: string, updates: Partial<Appointment>) => void;
@@ -154,9 +149,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       const { apiClient } = await import('@/lib/api-client');
       const appointments = await apiClient.getAppointments();
       set({ appointments, isLoadingAppointments: false });
-    } catch (error) {
+    } catch {
       set({ isLoadingAppointments: false });
-      throw error;
+      throw new Error('Failed to fetch appointments');
     }
   },
 
