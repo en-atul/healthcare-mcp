@@ -22,20 +22,18 @@ export class McpController {
     private readonly configService: ConfigService,
   ) {}
 
-  // Helper method to validate MCP API key (only for external requests)
   private validateMcpApiKey(apiKey: string, req: Request): boolean {
-    // Skip API key validation for internal NestJS requests
-    const userAgent = req.headers['user-agent'] || '';
+    const userAgent = (req.headers['user-agent'] || '') as string;
     const isInternalRequest =
       userAgent.includes('NestJS') ||
       req.headers['x-internal-request'] === 'true' ||
       req.headers['x-mcp-api-key'] === undefined;
 
     if (isInternalRequest) {
-      return true; // Allow internal requests without API key
+      return true;
     }
 
-    // Require API key for external requests (Claude/ChatGPT)
+    // Require API key for external requests (Claude/ChatGPT Desktop App)
     return apiKey === this.configService.mcpApiKey;
   }
 
@@ -165,7 +163,6 @@ export class McpController {
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-return
     return await this.llmIntegrationService.processUserMessage(
       body.message,
       jwtToken,

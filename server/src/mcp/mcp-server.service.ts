@@ -100,7 +100,7 @@ export class McpServerService {
         success: true,
         data: appointment,
         message: 'Appointment booked successfully',
-        formattedResponse: `Appointment booked successfully!\n\nDetails:\n- Date: ${new Date(appointmentDate).toLocaleString()}\n- Duration: ${duration} minutes\n- Appointment ID: ${appointment._id}`,
+        formattedResponse: `Appointment booked successfully!\n\nDetails:\n- Date: ${new Date(appointmentDate).toLocaleString()}\n- Duration: ${duration} minutes\n- Appointment ID: ${appointment._id?.toString() || 'N/A'}`,
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) {

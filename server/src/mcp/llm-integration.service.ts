@@ -20,20 +20,37 @@ export class LlmIntegrationService {
   async processUserMessage(userMessage: string, jwtToken?: string) {
     try {
       // Use OpenAI to understand the user's intent and extract parameters
-      const analysis = await this.analyzeMessageWithOpenAI(userMessage, jwtToken);
-      
+      const analysis = await this.analyzeMessageWithOpenAI(
+        userMessage,
+        jwtToken,
+      );
+
       if (!analysis.success) {
         return analysis;
       }
 
-      // Execute the appropriate MCP tool based on OpenAI's analysis
-      const result = await this.executeMcpTool(analysis.intent, analysis.parameters, jwtToken);
-      return result;
+      // Type guard to ensure we have the required properties
+      if ('intent' in analysis && 'parameters' in analysis) {
+        // Execute the appropriate MCP tool based on OpenAI's analysis
+        const result = await this.executeMcpTool(
+          analysis.intent,
+          analysis.parameters || {},
+          jwtToken,
+        );
+        return result;
+      }
+
+      // Fallback for unexpected analysis structure
+      return {
+        success: false,
+        error: 'Invalid analysis result',
+        message: 'Failed to understand the request structure',
+      };
     } catch (error) {
       return {
         success: false,
-        error: error.message,
-        message: 'Failed to process user message'
+        error: error instanceof Error ? error.message : 'Unknown error',
+        message: 'Failed to process user message',
       };
     }
   }
@@ -63,10 +80,10 @@ Return a JSON response with:
 If the message is unclear, set intent to "unclear" and provide a helpful message.`;
 
       const completion = await this.openai.chat.completions.create({
-        model: "gpt-3.5-turbo",
+        model: 'gpt-3.5-turbo',
         messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: message }
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: message },
         ],
         temperature: 0.1,
         max_tokens: 500,
@@ -78,53 +95,69 @@ If the message is unclear, set intent to "unclear" and provide a helpful message
       }
 
       // Parse OpenAI's JSON response
-      const analysis = JSON.parse(response);
-      
+      const analysis = JSON.parse(response) as {
+        requiresAuth: boolean;
+        intent: string;
+        confidence: number;
+        parameters?: Record<string, unknown>;
+      };
+
       // Check if authentication is required but not provided
       if (analysis.requiresAuth && !jwtToken) {
         return {
           success: false,
           error: 'Authentication required',
-          message: 'Please log in to perform this action'
+          message: 'Please log in to perform this action',
         };
       }
 
       return {
         success: true,
-        ...analysis
+        ...analysis,
       };
-
     } catch (error) {
       console.error('OpenAI analysis error:', error);
       return {
         success: false,
         error: 'Failed to understand request',
-        message: 'I had trouble understanding your request. Please try rephrasing it.'
+        message:
+          'I had trouble understanding your request. Please try rephrasing it.',
       };
     }
   }
 
-  private async executeMcpTool(intent: string, parameters: any, jwtToken?: string) {
+  private async executeMcpTool(
+    intent: string,
+    parameters: Record<string, unknown>,
+    jwtToken?: string,
+  ) {
     try {
       switch (intent) {
         case 'list-therapists':
           return await this.mcpService.listTherapists();
 
-        case 'book-appointment':
+        case 'book-appointment': {
           if (!jwtToken) {
             return {
               success: false,
               error: 'Authentication required',
-              message: 'Please log in to book an appointment'
+              message: 'Please log in to book an appointment',
             };
           }
-          
-          const { therapistId, appointmentDate, duration, notes } = parameters;
+
+          const { therapistId, appointmentDate, duration, notes } =
+            parameters as {
+              therapistId?: string;
+              appointmentDate?: string;
+              duration?: number;
+              notes?: string;
+            };
           if (!therapistId || !appointmentDate || !duration) {
             return {
               success: false,
               error: 'Missing required parameters',
-              message: 'Please provide therapist ID, appointment date, and duration'
+              message:
+                'Please provide therapist ID, appointment date, and duration',
             };
           }
 
@@ -133,74 +166,82 @@ If the message is unclear, set intent to "unclear" and provide a helpful message
             therapistId,
             appointmentDate,
             duration,
-            notes
+            notes,
           );
+        }
 
         case 'list-appointments':
           if (!jwtToken) {
             return {
               success: false,
               error: 'Authentication required',
-              message: 'Please log in to view your appointments'
+              message: 'Please log in to view your appointments',
             };
           }
-          
+
           return await this.mcpService.listAppointments(jwtToken);
 
-        case 'cancel-appointment':
+        case 'cancel-appointment': {
           if (!jwtToken) {
             return {
               success: false,
               error: 'Authentication required',
-              message: 'Please log in to cancel appointments'
+              message: 'Please log in to cancel appointments',
             };
           }
-          
-          const { appointmentId, cancellationReason } = parameters;
+
+          const { appointmentId, cancellationReason } = parameters as {
+            appointmentId?: string;
+            cancellationReason?: string;
+          };
           if (!appointmentId) {
             return {
               success: false,
               error: 'Missing appointment ID',
-              message: 'Please provide the appointment ID to cancel'
+              message: 'Please provide the appointment ID to cancel',
             };
           }
 
           return await this.mcpService.cancelAppointment(
             jwtToken,
             appointmentId,
-            cancellationReason
+            cancellationReason,
           );
+        }
 
         case 'get-profile':
           if (!jwtToken) {
             return {
               success: false,
               error: 'Authentication required',
-              message: 'Please log in to view your profile'
+              message: 'Please log in to view your profile',
             };
           }
-          
+
           return await this.mcpService.getProfile(jwtToken);
 
         case 'unclear':
           return {
             success: false,
             error: 'Unclear request',
-            message: parameters.message || 'I\'m not sure what you want. I can help you:\n- List therapists\n- Book appointments\n- View your appointments\n- Cancel appointments\n- View your profile'
+            message:
+              parameters.message ||
+              "I'm not sure what you want. I can help you:\n- List therapists\n- Book appointments\n- View your appointments\n- Cancel appointments\n- View your profile",
           };
 
         default:
           return {
             success: false,
             error: 'Unknown intent',
-            message: 'I don\'t understand what you want to do. Please try rephrasing your request.'
+            message:
+              "I don't understand what you want to do. Please try rephrasing your request.",
           };
       }
     } catch (error) {
       return {
         success: false,
-        error: error.message,
-        message: 'Failed to execute the requested action'
+        error: error instanceof Error ? error.message : 'Unknown error',
+        message: 'Failed to execute the requested action',
       };
     }
   }

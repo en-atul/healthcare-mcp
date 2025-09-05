@@ -9,6 +9,7 @@ import { Model } from 'mongoose';
 import * as bcrypt from 'bcryptjs';
 import { Patient, PatientDocument } from '../patients/schemas/patient.schema';
 import { LoginDto, RegisterPatientDto } from './dto/auth.dto';
+import { JwtPayload } from '../common/auth.utils';
 
 @Injectable()
 export class AuthService {
@@ -39,8 +40,8 @@ export class AuthService {
     const savedPatient = await patient.save();
 
     // Generate JWT token
-    const payload = {
-      sub: savedPatient._id,
+    const payload: JwtPayload = {
+      sub: savedPatient._id.toString(),
       email: savedPatient.email,
       role: savedPatient.role,
     };
@@ -73,8 +74,8 @@ export class AuthService {
     }
 
     // Generate JWT token
-    const payload = {
-      sub: patient._id,
+    const payload: JwtPayload = {
+      sub: patient._id.toString(),
       email: patient.email,
       role: patient.role,
     };

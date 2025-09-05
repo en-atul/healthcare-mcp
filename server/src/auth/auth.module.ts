@@ -10,11 +10,9 @@ import { Patient, PatientSchema } from '../patients/schemas/patient.schema';
 @Global()
 @Module({
   imports: [
-    MongooseModule.forFeature([
-      { name: Patient.name, schema: PatientSchema },
-    ]),
+    MongooseModule.forFeature([{ name: Patient.name, schema: PatientSchema }]),
     JwtModule.registerAsync({
-      useFactory: async (configService: ConfigService) => ({
+      useFactory: (configService: ConfigService) => ({
         secret: configService.jwtSecret,
         signOptions: {
           expiresIn: configService.jwtExpiresIn,

@@ -24,7 +24,7 @@ export class McpClientService implements OnModuleInit, OnModuleDestroy {
         case 'list_therapists':
           return await this.mcpServerService.listTherapists();
 
-        case 'book_appointment':
+        case 'book_appointment': {
           const { therapistId, appointmentDate, duration, notes } = args;
           return await this.mcpServerService.bookAppointment(
             args.jwtToken as string,
@@ -33,19 +33,21 @@ export class McpClientService implements OnModuleInit, OnModuleDestroy {
             duration as number,
             notes as string | undefined,
           );
+        }
 
         case 'list_appointments':
           return await this.mcpServerService.listAppointments(
             args.jwtToken as string,
           );
 
-        case 'cancel_appointment':
+        case 'cancel_appointment': {
           const { appointmentId, cancellationReason } = args;
           return await this.mcpServerService.cancelAppointment(
             args.jwtToken as string,
             appointmentId as string,
             cancellationReason as string | undefined,
           );
+        }
 
         case 'get_profile':
           return await this.mcpServerService.getProfile(
@@ -55,8 +57,10 @@ export class McpClientService implements OnModuleInit, OnModuleDestroy {
         default:
           throw new Error(`Unknown tool: ${tool}`);
       }
-    } catch (error: any) {
-      console.error(`Error calling MCP tool ${tool}:`, error.message);
+    } catch (error) {
+      const errorMessage =
+        error instanceof Error ? error.message : 'Unknown error';
+      console.error(`Error calling MCP tool ${tool}:`, errorMessage);
       throw error;
     }
   }

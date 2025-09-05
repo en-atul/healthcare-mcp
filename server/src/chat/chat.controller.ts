@@ -6,11 +6,12 @@ import {
   UseGuards,
   Request,
   Query,
+  Req,
 } from '@nestjs/common';
 import { McpClientService } from '../mcp/mcp-client.service';
 import { LlmService } from '../llm/llm.service';
 import { RagService } from '../rag/rag.service';
-import { JwtAuthGuard } from 'src/auth/guards/jwt-auth.guard';
+import { JwtAuthGuard } from '../auth/guards/jwt-auth.guard';
 
 @Controller('chat')
 @UseGuards(JwtAuthGuard)
@@ -27,17 +28,21 @@ export class ChatController {
       // Simple JWT decode - in production, use proper JWT service
       const payload = JSON.parse(
         Buffer.from(token.split('.')[1], 'base64').toString(),
-      );
+      ) as { sub: string };
       return payload.sub;
-    } catch (error) {
+    } catch {
       throw new Error('Invalid JWT token');
     }
   }
 
   @Get('history')
-  async getConversationHistory(@Request() req, @Query('limit') limit?: string) {
+  async getConversationHistory(
+    @Req() req: Request,
+    @Query('limit') limit?: string,
+  ) {
     try {
-      const authorization = req.headers.authorization;
+      const authorization = (req.headers as { authorization?: string })
+        ?.authorization;
       const jwtToken = authorization?.replace('Bearer ', '');
 
       if (!jwtToken) {
@@ -64,7 +69,7 @@ export class ChatController {
       console.error('❌ Error retrieving conversation history:', error);
       return {
         success: false,
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
         data: [],
         total: 0,
         limit: 0,
@@ -73,12 +78,13 @@ export class ChatController {
   }
 
   @Post()
-  async handleMessage(@Body('message') message: string, @Request() req) {
+  async handleMessage(@Body('message') message: string, @Req() req: Request) {
     try {
       console.log('📨 User message:', message);
 
       // Extract JWT token from request headers
-      const authorization = req.headers.authorization;
+      const authorization = (req.headers as { authorization?: string })
+        ?.authorization;
       const jwtToken = authorization?.replace('Bearer ', '');
 
       if (!jwtToken) {
@@ -119,13 +125,26 @@ export class ChatController {
         // Update response with action result
         if (actionResult) {
           // If actionResult has formattedResponse, use it
-          if ((actionResult as any).formattedResponse) {
-            finalResponse = (actionResult as any).formattedResponse;
+          if (
+            actionResult &&
+            typeof actionResult === 'object' &&
+            'formattedResponse' in actionResult
+          ) {
+            finalResponse = (actionResult as { formattedResponse: string })
+              .formattedResponse;
           }
           // If actionResult has raw data, include it in the response
-          if ((actionResult as any).data) {
+          if (
+            actionResult &&
+            typeof actionResult === 'object' &&
+            'data' in actionResult
+          ) {
             // Keep the formatted response but also include raw data
-            finalResponse = (actionResult as any).formattedResponse || finalResponse;
+            const resultWithData = actionResult as {
+              formattedResponse?: string;
+              data: unknown;
+            };
+            finalResponse = resultWithData.formattedResponse || finalResponse;
           }
         }
       }
@@ -134,22 +153,27 @@ export class ChatController {
         answer: finalResponse,
         action: ragResponse.action,
         parameters: ragResponse.parameters,
-        actionResult: actionResult,
-        rawData: actionResult ? (actionResult as any).data : null,
-        context: ragResponse.context,
+        actionResult: actionResult as Record<string, unknown> | null,
+        rawData:
+          actionResult &&
+          typeof actionResult === 'object' &&
+          'data' in actionResult
+            ? (actionResult as { data: unknown }).data
+            : null,
+        context: ragResponse.context as Record<string, unknown> | undefined,
       };
     } catch (error) {
       console.error('❌ Error in RAG chat pipeline:', error);
       return {
         answer:
           'I apologize, but I encountered an error processing your request. Please try again.',
-        error: error.message,
+        error: error instanceof Error ? error.message : 'Unknown error',
       };
     }
   }
 
   @Get('tools')
-  async getAvailableTools() {
+  getAvailableTools() {
     return {
       tools: [
         'list_therapists',
@@ -158,12 +182,12 @@ export class ChatController {
         'cancel_appointment',
         'get_profile',
       ],
-      systemPrompt: await this.llmService.getSystemPrompt(),
+      systemPrompt: this.llmService.getSystemPrompt(),
     };
   }
 
   @Get('health')
-  async health() {
+  health() {
     return {
       status: 'ok',
       timestamp: new Date().toISOString(),
