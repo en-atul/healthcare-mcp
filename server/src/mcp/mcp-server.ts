@@ -4,7 +4,7 @@ import { z } from 'zod';
 import axios from 'axios';
 
 // Configuration
-const NESTJS_BASE_URL = process.env.NESTJS_BASE_URL || 'http://localhost:3000';
+const NESTJS_BASE_URL = process.env.NESTJS_BASE_URL || 'http://localhost:3001';
 const MCP_API_KEY =
   process.env.MCP_API_KEY || 'your-secret-mcp-api-key-change-in-production';
 

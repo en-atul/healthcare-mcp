@@ -27,19 +27,16 @@ export class RagService implements OnModuleInit {
 
   async onModuleInit() {
     try {
-      // Initialize ChromaDB client
       this.chromaClient = new ChromaClient({
-        host: 'localhost',
-        port: 8001,
+        host: this.configService.chromaHost,
+        port: this.configService.chromaPort,
       });
 
-      // Initialize OpenAI embeddings
       this.embeddings = new OpenAIEmbeddings({
         openAIApiKey: this.configService.openaiApiKey,
         modelName: 'text-embedding-3-small',
       });
 
-      // Initialize ChatOpenAI
       this.llm = new ChatOpenAI({
         openAIApiKey: this.configService.openaiApiKey,
         modelName: this.configService.openaiModel,
@@ -76,7 +73,6 @@ export class RagService implements OnModuleInit {
     }
   }
 
-  // Extract patient ID from JWT token
   private extractPatientIdFromToken(token: string): string {
     try {
       const payload = this.jwtService.verify(token) satisfies {
@@ -121,10 +117,8 @@ export class RagService implements OnModuleInit {
         },
       });
 
-      // Generate embedding
       const embedding = await this.embeddings.embedQuery(document.pageContent);
 
-      // Store in ChromaDB
       await this.collection.add({
         ids: [`${patientId}_${Date.now()}`],
         embeddings: [embedding],
@@ -288,7 +282,6 @@ export class RagService implements OnModuleInit {
         },
       });
 
-      // Generate embedding
       const embedding = await this.embeddings.embedQuery(document.pageContent);
 
       // Store in ChromaDB with a special prefix for MCP results
@@ -317,10 +310,8 @@ export class RagService implements OnModuleInit {
         return [];
       }
 
-      // Generate query embedding
       const queryEmbedding = await this.embeddings.embedQuery(query);
 
-      // Search in ChromaDB
       const results = await this.collection.query({
         queryEmbeddings: [queryEmbedding],
         nResults: limit,
@@ -363,7 +354,6 @@ export class RagService implements OnModuleInit {
     }
   }
 
-  // Get conversation history for frontend display
   async getConversationHistory(
     patientId: string,
     limit: number = 50,
@@ -463,7 +453,6 @@ export class RagService implements OnModuleInit {
         })
         .flat();
 
-      // Sort by timestamp (newest first)
       history.sort(
         (a, b) =>
           new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
@@ -508,13 +497,11 @@ export class RagService implements OnModuleInit {
     try {
       const patientId = this.extractPatientIdFromToken(jwtToken);
 
-      // Retrieve relevant conversation context
       const contextDocs = await this.retrieveConversationContext(
         patientId,
         message,
       );
 
-      // Get current patient data for context
       const appointments = await this.getPatientAppointments(patientId);
       const therapists = await this.getAvailableTherapists();
       const patient = await this.patientsService.findById(patientId);
@@ -747,7 +734,6 @@ The MCP tools return structured JSON data that should be passed through to the u
       } else if (value instanceof Date) {
         sanitized[key] = value.toISOString();
       } else if (typeof value === 'object') {
-        // Convert objects to JSON strings
         sanitized[key] = JSON.stringify(value);
       } else {
         // Convert everything else to string (functions, symbols, etc.)

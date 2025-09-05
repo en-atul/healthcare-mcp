@@ -200,6 +200,13 @@ export class ConfigService {
     return this.configService.get<number>('port') || 3001;
   }
 
+  get chromaHost(): string {
+    return this.configService.get<string>('chroma.host') || 'localhost';
+  }
+  get chromaPort(): number {
+    return this.configService.get<number>('chroma.port') || 8001;
+  }
+
   // Helper method to get nested config values
   get<T>(key: string): T | undefined {
     return this.configService.get<T>(key);
