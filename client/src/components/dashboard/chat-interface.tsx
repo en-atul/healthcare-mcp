@@ -79,13 +79,25 @@ export function ChatInterface() {
     }
   };
 
-  const renderMessageContent = (message: any) => {
+  const renderMessageContent = (message: {
+    type?: string;
+    data?: unknown;
+    content?: string;
+    role?: string;
+  }) => {
     if (message.type === 'therapist_list' && message.data) {
       return (
         <div className="space-y-2">
           <p>{message.content}</p>
           <div className="grid gap-2">
-            {message.data.map((therapist: any) => (
+            {(message.data as Array<{
+              _id: string;
+              firstName: string;
+              lastName: string;
+              specialization: string;
+              experience: number;
+              rating: number;
+            }>).map((therapist) => (
               <Card key={therapist._id} className="p-3">
                 <div className="flex items-center justify-between">
                   <div>
@@ -112,6 +124,11 @@ export function ChatInterface() {
     }
 
     if (message.type === 'appointment' && message.data) {
+      const appointmentData = message.data as {
+        date: string;
+        time: string;
+        therapistName: string;
+      };
       return (
         <div className="space-y-2">
           <p>{message.content}</p>
@@ -121,10 +138,10 @@ export function ChatInterface() {
               <div>
                 <p className="font-medium">Appointment Details</p>
                 <p className="text-sm text-muted-foreground">
-                  {format(new Date(message.data.date), 'MMM dd, yyyy')} at {message.data.time}
+                  {format(new Date(appointmentData.date), 'MMM dd, yyyy')} at {appointmentData.time}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  with Dr. {message.data.therapistName}
+                  with Dr. {appointmentData.therapistName}
                 </p>
               </div>
             </div>

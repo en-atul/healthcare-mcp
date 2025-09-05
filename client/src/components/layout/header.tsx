@@ -26,7 +26,7 @@ export function Header() {
     try {
       logout();
       toast.success('Logged out successfully');
-      window.location.href = '/login';
+      window.location.href = '/auth';
     } catch {
       toast.error('Logout failed');
     } finally {

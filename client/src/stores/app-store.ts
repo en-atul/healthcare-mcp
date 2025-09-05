@@ -30,7 +30,7 @@ export interface ChatMessage {
   role: 'user' | 'assistant';
   timestamp: Date;
   type?: 'text' | 'appointment' | 'therapist_list' | 'profile';
-  data?: any;
+  data?: unknown;
 }
 
 interface AppState {
@@ -181,14 +181,27 @@ export const useAppStore = create<AppState>((set, get) => ({
       console.log('History data to process:', historyData);
       
       // Convert history to ChatMessage format
-      const newMessages: ChatMessage[] = (historyData || []).map((item: any) => ({
-        id: item._id || item.id || Date.now().toString() + Math.random(),
-        content: item.message || item.content || item.text || '',
-        role: item.type || item.role || 'user', // Use 'type' field from API response
-        timestamp: new Date(item.timestamp || item.createdAt || new Date()),
-        type: item.type,
-        data: item.data,
-      }));
+      const newMessages: ChatMessage[] = (historyData || []).map((item: unknown) => {
+        const chatItem = item as {
+          _id?: string;
+          id?: string;
+          message?: string;
+          content?: string;
+          text?: string;
+          type?: string;
+          role?: string;
+          timestamp?: string;
+          createdAt?: string;
+        };
+        return {
+          id: chatItem._id || chatItem.id || Date.now().toString() + Math.random(),
+          content: chatItem.message || chatItem.content || chatItem.text || '',
+          role: (chatItem.type || chatItem.role || 'user') as 'user' | 'assistant',
+          timestamp: new Date(chatItem.timestamp || chatItem.createdAt || new Date()),
+          type: chatItem.type as 'text' | 'appointment' | 'therapist_list' | 'profile' | undefined,
+          data: (item as { data?: unknown }).data,
+        };
+      });
       
       console.log('Converted chat messages:', newMessages);
       
@@ -275,14 +288,15 @@ export const useAppStore = create<AppState>((set, get) => ({
       get().addChatMessage(assistantMessage);
 
       // Check if the response contains appointment-related actions
-      if ((data as any).action === 'book_appointment' || (data as any).action === 'cancel_appointment') {
-        console.log('Appointment action detected:', (data as any).action, '- Re-fetching appointments');
+      const responseData = data as { action?: string };
+      if (responseData.action === 'book_appointment' || responseData.action === 'cancel_appointment') {
+        console.log('Appointment action detected:', responseData.action, '- Re-fetching appointments');
         // Re-fetch appointments to update the appointments panel
-        get().fetchAppointments().catch((error) => {
-          console.error('Failed to re-fetch appointments after action:', error);
+        get().fetchAppointments().catch(() => {
+          console.error('Failed to re-fetch appointments after action');
         });
       }
-    } catch (error) {
+    } catch {
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         content: 'Sorry, I encountered an error. Please try again.',

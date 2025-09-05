@@ -20,7 +20,7 @@ export default function Dashboard() {
     console.log('Dashboard - Auth state:', { isAuthenticated, user: !!user, token: !!token });
     
     if (!isAuthenticated || !user || !token) {
-      router.push('/login');
+      router.push('/auth');
     }
   }, [isAuthenticated, user, token, isHydrated, router]);
 

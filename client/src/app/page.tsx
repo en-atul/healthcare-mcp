@@ -16,7 +16,7 @@ export default function Home() {
     if (isAuthenticated && user && token) {
       router.push('/dashboard');
     } else {
-      router.push('/login');
+      router.push('/auth');
     }
   }, [isAuthenticated, user, token, isHydrated, router]);
 

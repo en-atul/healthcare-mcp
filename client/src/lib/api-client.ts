@@ -32,7 +32,7 @@ class ApiClient {
       (error) => {
         if (error.response?.status === 401) {
           this.clearToken();
-          window.location.href = '/login';
+          window.location.href = '/auth';
         }
         return Promise.reject(error);
       },
@@ -74,7 +74,7 @@ class ApiClient {
     lastName: string,
     email: string,
     password: string,
-    additionalData?: any,
+    additionalData?: Record<string, unknown>,
   ) {
     try {
       const response = await this.client.post('/auth/register', {
@@ -118,7 +118,7 @@ class ApiClient {
     return response.data;
   }
 
-  async updateAppointment(appointmentId: string, updates: any) {
+  async updateAppointment(appointmentId: string, updates: Record<string, unknown>) {
     const response = await this.client.patch(
       `/appointments/${appointmentId}`,
       updates,
@@ -170,7 +170,7 @@ class ApiClient {
     return response.data;
   }
 
-  async updatePatient(patientId: string, updates: any) {
+  async updatePatient(patientId: string, updates: Record<string, unknown>) {
     const response = await this.client.patch(`/patients/${patientId}`, updates);
     return response.data;
   }
