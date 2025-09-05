@@ -82,7 +82,7 @@ export function AppointmentsPanel() {
   }
 
   return (
-    <div className="h-full flex flex-col space-y-4">
+    <div className="h-full flex flex-col space-y-4 border rounded-lg bg-card p-4 overflow-hidden">
       {/* Header */}
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">My Appointments</h2>
@@ -104,7 +104,7 @@ export function AppointmentsPanel() {
             {upcomingAppointments.length} appointment{upcomingAppointments.length !== 1 ? 's' : ''} scheduled
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3 overflow-y-auto max-h-64">
           {upcomingAppointments.length === 0 ? (
             <div className="text-center py-6">
               <Calendar className="h-8 w-8 mx-auto mb-2 text-muted-foreground" />
@@ -162,7 +162,7 @@ export function AppointmentsPanel() {
           <CardHeader>
             <CardTitle className="text-base">Recent</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-2">
+          <CardContent className="space-y-2 overflow-y-auto max-h-32">
             {pastAppointments.map((appointment) => (
               <div
                 key={appointment._id}

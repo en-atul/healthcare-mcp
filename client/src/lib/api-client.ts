@@ -150,9 +150,13 @@ class ApiClient {
     };
   }
 
-  async getChatHistory(limit?: number) {
+  async getChatHistory(limit?: number, page?: number) {
+    const params = new URLSearchParams();
+    if (limit) params.append('limit', limit.toString());
+    if (page) params.append('page', page.toString());
+    
     const response = await this.client.get(
-      `/chat/history${limit ? `?limit=${limit}` : ''}`,
+      `/chat/history${params.toString() ? `?${params.toString()}` : ''}`,
     );
     return response.data;
   }

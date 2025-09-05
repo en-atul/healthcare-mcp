@@ -48,6 +48,9 @@ interface AppState {
   chatMessages: ChatMessage[];
   isChatLoading: boolean;
   chatInput: string;
+  isChatHistoryLoading: boolean;
+  hasMoreChatHistory: boolean;
+  chatPage: number;
 
   // UI State
   isAppointmentModalOpen: boolean;
@@ -69,6 +72,9 @@ interface AppState {
   setChatMessages: (messages: ChatMessage[]) => void;
   setChatInput: (input: string) => void;
   setChatLoading: (loading: boolean) => void;
+  setChatHistoryLoading: (loading: boolean) => void;
+  setHasMoreChatHistory: (hasMore: boolean) => void;
+  setChatPage: (page: number) => void;
   clearChat: () => void;
 
   setAppointmentModalOpen: (open: boolean) => void;
@@ -77,6 +83,8 @@ interface AppState {
   // API Actions
   fetchAppointments: () => Promise<void>;
   fetchTherapists: () => Promise<void>;
+  fetchChatHistory: (page?: number, append?: boolean) => Promise<void>;
+  loadMoreChatHistory: () => Promise<void>;
   bookAppointment: (therapistId: string, date: string, time: string) => Promise<void>;
   cancelAppointment: (appointmentId: string) => Promise<void>;
   sendChatMessage: (message: string) => Promise<void>;
@@ -95,6 +103,9 @@ export const useAppStore = create<AppState>((set, get) => ({
   chatMessages: [],
   isChatLoading: false,
   chatInput: '',
+  isChatHistoryLoading: false,
+  hasMoreChatHistory: true,
+  chatPage: 1,
 
   isAppointmentModalOpen: false,
   isProfileModalOpen: false,
@@ -106,11 +117,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   })),
   updateAppointment: (id, updates) => set((state) => ({
     appointments: state.appointments.map(apt => 
-      apt.id === id ? { ...apt, ...updates } : apt
+      apt._id === id ? { ...apt, ...updates } : apt
     )
   })),
   deleteAppointment: (id) => set((state) => ({
-    appointments: state.appointments.filter(apt => apt.id !== id)
+    appointments: state.appointments.filter(apt => apt._id !== id)
   })),
   setSelectedAppointment: (appointment) => set({ selectedAppointment: appointment }),
   setLoadingAppointments: (loading) => set({ isLoadingAppointments: loading }),
@@ -127,7 +138,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   setChatMessages: (messages) => set({ chatMessages: messages }),
   setChatInput: (input) => set({ chatInput: input }),
   setChatLoading: (loading) => set({ isChatLoading: loading }),
-  clearChat: () => set({ chatMessages: [] }),
+  setChatHistoryLoading: (loading) => set({ isChatHistoryLoading: loading }),
+  setHasMoreChatHistory: (hasMore) => set({ hasMoreChatHistory: hasMore }),
+  setChatPage: (page) => set({ chatPage: page }),
+  clearChat: () => set({ chatMessages: [], chatPage: 1, hasMoreChatHistory: true }),
 
   // UI actions
   setAppointmentModalOpen: (open) => set({ isAppointmentModalOpen: open }),
@@ -156,6 +170,61 @@ export const useAppStore = create<AppState>((set, get) => ({
       set({ isLoadingTherapists: false });
       throw error;
     }
+  },
+
+  fetchChatHistory: async (page = 1, append = false) => {
+    try {
+      set({ isChatHistoryLoading: true });
+      const { apiClient } = await import('@/lib/api-client');
+      const response = await apiClient.getChatHistory(20, page); // 20 messages per page
+      
+      console.log('Chat history response received:', response);
+      
+      // Extract the data array from the response
+      const historyData = response?.data || response || [];
+      
+      console.log('History data to process:', historyData);
+      
+      // Convert history to ChatMessage format
+      const newMessages: ChatMessage[] = (historyData || []).map((item: any) => ({
+        id: item._id || item.id || Date.now().toString() + Math.random(),
+        content: item.message || item.content || item.text || '',
+        role: item.type || item.role || 'user', // Use 'type' field from API response
+        timestamp: new Date(item.timestamp || item.createdAt || new Date()),
+        type: item.type,
+        data: item.data,
+      }));
+      
+      console.log('Converted chat messages:', newMessages);
+      
+      if (append) {
+        // Append older messages to the beginning (for infinite scroll)
+        set((state) => ({
+          chatMessages: [...newMessages, ...state.chatMessages],
+          chatPage: page,
+          hasMoreChatHistory: newMessages.length === 20, // If we got less than 20, no more pages
+        }));
+      } else {
+        // Replace messages (initial load) - reverse order so newest are at bottom
+        set({
+          chatMessages: newMessages.reverse(),
+          chatPage: page,
+          hasMoreChatHistory: newMessages.length === 20,
+        });
+      }
+    } catch (error) {
+      console.error('Failed to fetch chat history:', error);
+      set({ hasMoreChatHistory: false });
+    } finally {
+      set({ isChatHistoryLoading: false });
+    }
+  },
+
+  loadMoreChatHistory: async () => {
+    const { chatPage, hasMoreChatHistory, isChatHistoryLoading } = get();
+    if (!hasMoreChatHistory || isChatHistoryLoading) return;
+    
+    await get().fetchChatHistory(chatPage + 1, true);
   },
 
   bookAppointment: async (therapistId: string, date: string, time: string) => {

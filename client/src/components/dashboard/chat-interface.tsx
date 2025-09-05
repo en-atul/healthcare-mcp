@@ -11,6 +11,8 @@ import { useAuthStore } from '@/stores/auth-store';
 import { toast } from 'sonner';
 import { Send, Bot, User, Calendar, Users, UserCheck, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 export function ChatInterface() {
   const [input, setInput] = useState('');
@@ -23,6 +25,10 @@ export function ChatInterface() {
     setChatInput,
     sendChatMessage,
     addChatMessage,
+    fetchChatHistory,
+    loadMoreChatHistory,
+    isChatHistoryLoading,
+    hasMoreChatHistory,
   } = useAppStore();
   
   const { user } = useAuthStore();
@@ -33,6 +39,21 @@ export function ChatInterface() {
 
   useEffect(() => {
     scrollToBottom();
+  }, [chatMessages]);
+
+  // Load chat history on component mount
+  useEffect(() => {
+    if (user && chatMessages.length === 0) {
+      console.log('Loading chat history for user:', user);
+      fetchChatHistory(1, false).catch((error) => {
+        console.error('Failed to load chat history:', error);
+      });
+    }
+  }, [user, chatMessages.length, fetchChatHistory]);
+
+  // Debug chat messages
+  useEffect(() => {
+    console.log('Chat messages updated:', chatMessages);
   }, [chatMessages]);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,6 +73,15 @@ export function ChatInterface() {
 
   const handleQuickAction = (action: string) => {
     setInput(action);
+  };
+
+  const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    const { scrollTop } = e.currentTarget;
+    
+    // Load more messages when scrolled to top
+    if (scrollTop === 0 && hasMoreChatHistory && !isChatHistoryLoading) {
+      loadMoreChatHistory();
+    }
   };
 
   const renderMessageContent = (message: any) => {
@@ -108,13 +138,50 @@ export function ChatInterface() {
       );
     }
 
-    return <p className="whitespace-pre-wrap">{message.content}</p>;
+    // Use markdown for assistant messages, plain text for user messages
+    if (message.role === 'assistant') {
+      return (
+        <div className="prose prose-sm max-w-none dark:prose-invert prose-headings:text-foreground prose-p:text-foreground prose-strong:text-foreground prose-em:text-foreground prose-li:text-foreground">
+          <ReactMarkdown 
+            remarkPlugins={[remarkGfm]}
+            components={{
+              // Customize markdown components for better styling
+              p: ({ children }) => <p className="mb-2 last:mb-0">{children}</p>,
+              ul: ({ children }) => <ul className="mb-2 last:mb-0 pl-4">{children}</ul>,
+              ol: ({ children }) => <ol className="mb-2 last:mb-0 pl-4">{children}</ol>,
+              li: ({ children }) => <li className="mb-1">{children}</li>,
+              strong: ({ children }) => <strong className="font-semibold">{children}</strong>,
+              em: ({ children }) => <em className="italic">{children}</em>,
+              code: ({ children }) => (
+                <code className="bg-muted px-1 py-0.5 rounded text-sm font-mono">
+                  {children}
+                </code>
+              ),
+              pre: ({ children }) => (
+                <pre className="bg-muted p-3 rounded-lg overflow-x-auto text-sm font-mono mb-2">
+                  {children}
+                </pre>
+              ),
+              blockquote: ({ children }) => (
+                <blockquote className="border-l-4 border-muted-foreground/20 pl-4 italic mb-2">
+                  {children}
+                </blockquote>
+              ),
+            }}
+          >
+            {message.content || 'No content'}
+          </ReactMarkdown>
+        </div>
+      );
+    }
+    
+    return <p className="whitespace-pre-wrap">{message.content || 'No content'}</p>;
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col border rounded-lg bg-card overflow-hidden">
       {/* Chat Header */}
-      <div className="flex items-center gap-2 p-4 border-b">
+      <div className="flex items-center gap-2 p-4 border-b bg-muted/50">
         <Bot className="h-5 w-5 text-primary" />
         <h2 className="font-semibold">Health Assistant</h2>
         <Badge variant="secondary" className="ml-auto">
@@ -122,8 +189,21 @@ export function ChatInterface() {
         </Badge>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      {/* Messages - Fixed height with scroll */}
+      <div 
+        className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
+        onScroll={handleScroll}
+      >
+        {/* Loading indicator for infinite scroll */}
+        {isChatHistoryLoading && (
+          <div className="flex justify-center py-4">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>Loading more messages...</span>
+            </div>
+          </div>
+        )}
+
         {chatMessages.length === 0 ? (
           <div className="text-center py-8">
             <Bot className="h-12 w-12 mx-auto mb-4 text-muted-foreground" />
@@ -173,9 +253,9 @@ export function ChatInterface() {
             </div>
           </div>
         ) : (
-          chatMessages.map((message) => (
+          chatMessages.map((message, index) => (
             <div
-              key={message.id}
+              key={message.id || `message-${index}`}
               className={`flex gap-3 ${
                 message.role === 'user' ? 'justify-end' : 'justify-start'
               }`}
@@ -197,7 +277,7 @@ export function ChatInterface() {
               >
                 {renderMessageContent(message)}
                 <div className="text-xs opacity-70 mt-1">
-                  {format(message.timestamp, 'HH:mm')}
+                  {message.timestamp ? format(message.timestamp, 'HH:mm') : 'Now'}
                 </div>
               </div>
 
@@ -231,8 +311,8 @@ export function ChatInterface() {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Input */}
-      <div className="p-4 border-t">
+      {/* Input - Fixed at bottom */}
+      <div className="p-4 border-t bg-muted/50">
         <form onSubmit={handleSubmit} className="flex gap-2">
           <Input
             value={input}
