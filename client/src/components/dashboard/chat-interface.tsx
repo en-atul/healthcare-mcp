@@ -231,21 +231,21 @@ export function ChatInterface() {
           <p className='text-sm'>{appointmentData.message}</p>
 
           </div>
-          <Card className="p-3 border-green-200 bg-green-50">
+          <Card className="p-3 border-gray-200 bg-gray-50 shadow-none">
             <div className="flex items-center gap-2">
-              <Calendar className="h-4 w-4 text-green-600" />
+              <Calendar className="h-4 w-4" />
               <div>
-                <p className="text-sm text-green-700">
+                <p className="text-sm text-gray-700">
                   {format(new Date(appointmentData.data.date), 'MMM dd, yyyy HH:mm')}
                 </p>
-                <p className="text-sm text-green-700">
+                <p className="text-sm text-gray-700">
                   with {appointmentData.data.therapistName}
                 </p>
-                <p className="text-sm text-green-700">
+                <p className="text-sm text-gray-700">
                   Duration: {appointmentData.data.duration} minutes
                 </p>
                 {appointmentData.data.notes && (
-                  <p className="text-sm text-green-700">
+                  <p className="text-sm text-gray-700">
                     Notes: {appointmentData.data.notes}
                   </p>
                 )}
