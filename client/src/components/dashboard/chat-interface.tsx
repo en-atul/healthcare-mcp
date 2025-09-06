@@ -44,11 +44,7 @@ export function ChatInterface() {
   const { user } = useAuthStore();
 
   useEffect(() => {
-    // Only auto-scroll if:
-    // 1. Not loading chat history
-    // 2. We should auto-scroll (user hasn't manually scrolled up)
     if (!isChatHistoryLoading && shouldAutoScroll) {
-      // For inverted infinite scroll, we need to scroll to the bottom
       const scrollContainer = document.getElementById('scrollableDiv');
       if (scrollContainer) {
         scrollContainer.scrollTop = scrollContainer.scrollHeight;
@@ -67,7 +63,6 @@ export function ChatInterface() {
     }
   }, [user, isChatHistoryLoading, fetchChatHistory]);
 
-  // Debug chat messages
   useEffect(() => {
     console.log('Chat messages updated:', chatMessages);
   }, [chatMessages]);
@@ -79,7 +74,6 @@ export function ChatInterface() {
     const message = input.trim();
     setInput('');
 
-    // Enable auto-scroll when sending a new message
     setShouldAutoScroll(true);
 
     try {
@@ -92,17 +86,13 @@ export function ChatInterface() {
 
   const handleQuickAction = (action: string) => {
     setInput(action);
-    // Enable auto-scroll when using quick actions
     setShouldAutoScroll(true);
   };
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     const { scrollTop, scrollHeight, clientHeight } = e.currentTarget;
 
-    // Check if user is at the bottom (within 100px)
     const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
-
-    // Update auto-scroll behavior based on user's scroll position
     if (isAtBottom) {
       setShouldAutoScroll(true);
     } else {
@@ -118,7 +108,6 @@ export function ChatInterface() {
   }) => {
     console.log('renderMessageContent called with:', message);
 
-    // Handle therapist list from server action
     if (message.type === 'list_therapists' && message.data) {
       const therapistsData = message.data as {
         success: boolean;
@@ -196,7 +185,6 @@ export function ChatInterface() {
       );
     }
 
-    // Handle appointment list from server action
     if (message.type === 'list_appointments' && message.data) {
       const appointmentsData = message.data as {
         success: boolean;
@@ -235,7 +223,6 @@ export function ChatInterface() {
       );
     }
 
-    // Handle appointment booking confirmation
     if (message.type === 'book_appointment' && message.data) {
       const appointmentData = message.data as {
         success: boolean;
@@ -270,7 +257,6 @@ export function ChatInterface() {
       );
     }
 
-    // Handle appointment cancellation confirmation
     if (message.type === 'cancel_appointment' && message.data) {
       const cancellationData = message.data as {
         success: boolean;
@@ -303,7 +289,6 @@ export function ChatInterface() {
       );
     }
 
-    // Handle profile data
     if (message.type === 'get_profile' && message.data) {
       const profileData = message.data as {
         success: boolean;

@@ -22,10 +22,8 @@ export class ChatController {
     private readonly ragService: RagService,
   ) {}
 
-  // Helper method to extract patient ID from JWT token
   private extractPatientIdFromToken(token: string): string {
     try {
-      // Simple JWT decode - in production, use proper JWT service
       const payload = JSON.parse(
         Buffer.from(token.split('.')[1], 'base64').toString(),
       ) as { sub: string };
@@ -52,7 +50,6 @@ export class ChatController {
       const patientId = this.extractPatientIdFromToken(jwtToken);
       const messageLimit = limit ? parseInt(limit, 10) : 50;
 
-      // Get conversation history from RAG service
       const history = await this.ragService.getConversationHistory(
         patientId,
         messageLimit,
@@ -70,7 +67,6 @@ export class ChatController {
     try {
       console.log('📨 User message:', message);
 
-      // Extract JWT token from request headers
       const authorization = (req.headers as { authorization?: string })
         ?.authorization;
       const jwtToken = authorization?.replace('Bearer ', '');
@@ -79,7 +75,6 @@ export class ChatController {
         throw new Error('JWT token not found in request');
       }
 
-      // Get recent conversation history for context
       let patientId: string;
       try {
         patientId = this.extractPatientIdFromToken(jwtToken);
@@ -89,7 +84,7 @@ export class ChatController {
       console.log('🔍 Getting conversation history for patient:', patientId);
       const conversationHistory = await this.ragService.getConversationHistory(
         patientId,
-        10, // Get last 10 messages for context
+        10,
       );
       console.log(
         '📚 Retrieved conversation history:',
@@ -97,7 +92,6 @@ export class ChatController {
         'messages',
       );
 
-      // Step 1: Process message with RAG
       console.log('🧠 RAG processing message...');
       const ragResponse = await this.ragService.processMessageWithRag(
         message,
@@ -111,7 +105,6 @@ export class ChatController {
       let finalResponse = ragResponse.response;
       let actionResult: any = null;
 
-      // Step 2: Execute action if needed
       if (ragResponse.action && ragResponse.parameters) {
         console.log('🔧 Executing action:', ragResponse.action);
         const argsWithToken = { ...ragResponse.parameters, jwtToken };
@@ -121,11 +114,7 @@ export class ChatController {
         );
         console.log('📊 Action result:', actionResult);
 
-        // Note: MCP operation result will be stored as part of the full conversation context
-
-        // Update response with action result
         if (actionResult) {
-          // Use the message from the action result if available
           if (
             actionResult &&
             typeof actionResult === 'object' &&
@@ -135,8 +124,6 @@ export class ChatController {
           }
         }
       }
-
-      // Store conversation context with full response structure
       const fullChatResponse = {
         type: 'assistant',
         answer: finalResponse,
@@ -168,7 +155,6 @@ export class ChatController {
       } catch (storageError) {
         console.error('❌ Failed to store conversation context:', storageError);
         console.log('⚠️  Continuing without storing conversation context');
-        // Don't throw the error - let the conversation continue
       }
 
       return {

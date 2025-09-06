@@ -37,7 +37,6 @@ export class RagService implements OnModuleInit {
         maxTokens: this.configService.openaiMaxTokens,
       });
 
-      // Initialize ChromaDB service
       await this.chromaService.initialize();
 
       console.log('✅ RAG Service initialized with ChromaDB');
@@ -69,7 +68,6 @@ export class RagService implements OnModuleInit {
     }
   }
 
-  // Store conversation context in ChromaDB
   async storeConversationContext(
     patientId: string,
     message: string,
@@ -93,7 +91,6 @@ export class RagService implements OnModuleInit {
         return;
       }
 
-      // Create user message
       const userMessage = {
         type: 'user',
         answer: message,
@@ -104,7 +101,6 @@ export class RagService implements OnModuleInit {
         timestamp: new Date().toISOString(),
       };
 
-      // Create assistant message with full structure
       const assistantMessage = fullChatResponse || {
         type: 'assistant',
         answer: response,
@@ -114,8 +110,6 @@ export class RagService implements OnModuleInit {
         rawData: null,
         timestamp: new Date().toISOString(),
       };
-
-      // Store user message
       const userDocument = new Document({
         pageContent: `User: ${userMessage.answer}`,
         metadata: {
@@ -148,7 +142,6 @@ export class RagService implements OnModuleInit {
         return; // Exit early if we can't store the user message
       }
 
-      // Store assistant message
       const assistantDocument = new Document({
         pageContent: `Assistant: ${assistantMessage.answer}`,
         metadata: {
@@ -185,7 +178,6 @@ export class RagService implements OnModuleInit {
     }
   }
 
-  // Store MCP operation results for future reference
   async storeMcpOperationResult(
     patientId: string,
     operation: string,
@@ -367,7 +359,6 @@ export class RagService implements OnModuleInit {
     }
   }
 
-  // Retrieve relevant conversation context
   async retrieveConversationContext(
     patientId: string,
     query: string,
@@ -405,7 +396,6 @@ export class RagService implements OnModuleInit {
     }
   }
 
-  // Get patient's current appointments for context
   async getPatientAppointments(patientId: string) {
     try {
       const appointments =
@@ -449,8 +439,6 @@ export class RagService implements OnModuleInit {
         patientId,
       );
 
-      // Get all conversation entries for this patient
-      // Note: ChromaDB's get() method doesn't guarantee order, so we'll sort by timestamp after retrieval
       const results = await this.chromaService.collection.get({
         where: { patientId },
         limit: limit * 2, // Get more than needed to ensure we have enough after sorting
@@ -460,14 +448,12 @@ export class RagService implements OnModuleInit {
         return [];
       }
 
-      // Parse and format conversation history
       const history = results.documents
         .map((doc, index) => {
           const metadata = results.metadatas?.[index] || {};
           const timestamp =
             (metadata.timestamp as string) || new Date().toISOString();
 
-          // Try to parse the full message from metadata
           if (metadata.fullMessage) {
             try {
               const fullMessage = JSON.parse(
@@ -496,7 +482,6 @@ export class RagService implements OnModuleInit {
             }
           }
 
-          // Fallback to basic message structure
           const messageType = (metadata.messageType as string) || 'user';
           const content = doc || '';
 
@@ -515,13 +500,11 @@ export class RagService implements OnModuleInit {
             item !== null && item !== undefined,
         );
 
-      // Sort by timestamp to ensure chronological order (oldest first)
       const sortedHistory = history.sort(
         (a, b) =>
           new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
       );
 
-      // Apply limit after sorting to ensure we get the most recent messages
       return sortedHistory.slice(-limit);
     } catch (error) {
       console.error('❌ Failed to get conversation history:', error);
@@ -529,7 +512,6 @@ export class RagService implements OnModuleInit {
     }
   }
 
-  // Clear conversation history for a patient (useful for testing)
   async clearConversationHistory(patientId: string) {
     try {
       if (!this.chromaService.collection) {
@@ -537,7 +519,6 @@ export class RagService implements OnModuleInit {
         return;
       }
 
-      // Delete all documents for this patient
       const results = await this.chromaService.collection.get({
         where: { patientId },
       });
@@ -553,7 +534,6 @@ export class RagService implements OnModuleInit {
     }
   }
 
-  // Get available therapists for context
   async getAvailableTherapists() {
     try {
       const therapists = await this.therapistsService.findAll();
@@ -569,7 +549,6 @@ export class RagService implements OnModuleInit {
     }
   }
 
-  // Process user message with RAG
   async processMessageWithRag(
     message: string,
     jwtToken: string,
@@ -600,7 +579,6 @@ export class RagService implements OnModuleInit {
       const therapists = await this.getAvailableTherapists();
       const patient = await this.patientsService.findById(patientId);
 
-      // Build context string
       const contextString = this.buildContextString(
         contextDocs,
         appointments,
@@ -608,27 +586,22 @@ export class RagService implements OnModuleInit {
         patient,
       );
 
-      // Create system prompt with context
       const systemPrompt = this.createSystemPrompt(contextString);
 
-      // Build conversation messages for LLM
       const messages: Array<{ role: string; content: string }> = [
         { role: 'system', content: systemPrompt },
       ];
 
-      // Add conversation history if available
       if (conversationHistory && conversationHistory.length > 0) {
         console.log(
           '📚 Conversation history for context:',
           JSON.stringify(conversationHistory.slice(-5), null, 2),
         );
-        // Add last 5 messages for context (to avoid token limits)
         const recentHistory = conversationHistory.slice(-5);
         for (const msg of recentHistory) {
           if (msg.type === 'user') {
             messages.push({ role: 'user', content: msg.answer });
           } else if (msg.type === 'assistant') {
-            // Include action and parameters in assistant messages for better context
             let assistantContent = msg.answer;
             if (msg.action) {
               assistantContent += `\n[Previous action: ${msg.action}]`;
@@ -643,18 +616,13 @@ export class RagService implements OnModuleInit {
         console.log('📚 No conversation history available for context');
       }
 
-      // Add current user message
       messages.push({ role: 'user', content: message });
 
-      // Generate response using LLM
       const response = await this.llm.invoke(messages);
 
       console.log('🤖 Raw LLM response:', response.content);
 
-      // Parse response for actions
       const parsedResponse = this.parseResponse(response.content as string);
-
-      // Note: Conversation context will be stored by the chat controller with full response structure
 
       return parsedResponse;
     } catch (error) {
@@ -693,7 +661,6 @@ export class RagService implements OnModuleInit {
   ): string {
     let context = `Patient: ${patient.firstName} ${patient.lastName} (${patient.email})\n\n`;
 
-    // Add conversation history
     if (contextDocs.length > 0) {
       context += 'Recent conversation:\n';
       contextDocs.forEach((doc) => {
@@ -701,7 +668,6 @@ export class RagService implements OnModuleInit {
       });
     }
 
-    // Add current appointments
     if (appointments.length > 0) {
       context += 'Current appointments:\n';
       appointments.forEach((apt) => {
@@ -710,7 +676,6 @@ export class RagService implements OnModuleInit {
       context += '\n';
     }
 
-    // Add available therapists
     context += 'Available therapists:\n';
     therapists.forEach((t) => {
       context += `- ID: ${t.id}, Name: ${t.name}, Specialization: ${t.specialization}\n`;
@@ -891,7 +856,6 @@ DO NOT provide natural language responses for data requests. ALWAYS use the ACTI
       .replace(/PARAMETERS:\s*.+/gi, '')
       .trim();
 
-    // If we have an action but no parameters, try to infer parameters based on the action
     if (actionMatch && !parametersMatch) {
       const action = actionMatch[1].trim().toLowerCase();
       let parameters = {};
@@ -917,7 +881,6 @@ DO NOT provide natural language responses for data requests. ALWAYS use the ACTI
       };
     }
 
-    // Check if the response is asking for more information (no action provided)
     const lowerResponse = response.toLowerCase();
     const isAskingForInfo =
       lowerResponse.includes('which therapist') ||
@@ -932,7 +895,6 @@ DO NOT provide natural language responses for data requests. ALWAYS use the ACTI
       lowerResponse.includes('few more details') ||
       lowerResponse.includes('provide the following details');
 
-    // Check if the response is repeating therapist list when it should use context
     const isRepeatingTherapistList =
       lowerResponse.includes('here are the available therapists') ||
       lowerResponse.includes('available therapists:') ||
@@ -961,7 +923,6 @@ DO NOT provide natural language responses for data requests. ALWAYS use the ACTI
       };
     }
 
-    // Fallback: Try to detect common phrases and map them to actions
     if (
       lowerResponse.includes('list') &&
       (lowerResponse.includes('therapist') || lowerResponse.includes('doctor'))
@@ -999,13 +960,11 @@ DO NOT provide natural language responses for data requests. ALWAYS use the ACTI
         const action = actionMatch[1].trim();
         let parametersString = parametersMatch[1].trim();
 
-        // Clean up the parameters string - remove newlines and fix formatting
         parametersString = parametersString
           .replace(/\n/g, ' ')
           .replace(/\s+/g, ' ')
           .trim();
 
-        // If it's not wrapped in braces, wrap it
         if (!parametersString.startsWith('{')) {
           parametersString = `{${parametersString}}`;
         }
@@ -1026,12 +985,10 @@ DO NOT provide natural language responses for data requests. ALWAYS use the ACTI
         console.error('❌ Failed to parse action parameters:', error);
         console.log('Raw parameters string:', parametersMatch[1]);
 
-        // Try to extract parameters manually as fallback
         try {
           const action = actionMatch[1].trim();
           const rawParams = parametersMatch[1].trim();
 
-          // Extract key-value pairs manually
           const paramPairs = rawParams.match(/"([^"]+)":\s*"([^"]+)"/g);
           if (paramPairs) {
             const parameters: Record<string, unknown> = {};
@@ -1057,14 +1014,16 @@ DO NOT provide natural language responses for data requests. ALWAYS use the ACTI
     return { response: cleanResponse || response };
   }
 
-  // Sanitize metadata for ChromaDB compatibility
   private sanitizeMetadata(
     metadata: Record<string, unknown>,
   ): Record<string, string | number | boolean> {
     const sanitized: Record<string, string | number | boolean> = {};
 
     for (const [key, value] of Object.entries(metadata)) {
-      // Skip null and undefined values entirely
+      /**
+       * skip null/undefined because chromadb doesn't process it
+       * even after they mentioned `null` as a possible type
+       */
       if (value === null || value === undefined) {
         continue;
       } else if (
@@ -1078,7 +1037,6 @@ DO NOT provide natural language responses for data requests. ALWAYS use the ACTI
       } else if (typeof value === 'object') {
         sanitized[key] = JSON.stringify(value);
       } else {
-        // Convert everything else to string (functions, symbols, etc.)
         if (typeof value === 'function') {
           sanitized[key] = '[Function]';
         } else if (typeof value === 'symbol') {
@@ -1086,7 +1044,6 @@ DO NOT provide natural language responses for data requests. ALWAYS use the ACTI
         } else if (typeof value === 'bigint') {
           sanitized[key] = value.toString();
         } else {
-          // For any other type, use a safe string conversion
           sanitized[key] = '[Unknown Type]';
         }
       }

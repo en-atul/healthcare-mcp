@@ -23,7 +23,6 @@ export class AuthService {
   async registerPatient(registerDto: RegisterPatientDto) {
     const { email, password, gender, ...rest } = registerDto;
 
-    // Check if patient already exists
     const existingPatient = await this.patientModel.findOne({ email });
     if (existingPatient) {
       throw new ConflictException('Patient with this email already exists');
@@ -36,7 +35,6 @@ export class AuthService {
       'medium',
     );
 
-    // Create patient
     const patient = new this.patientModel({
       email,
       password: hashedPassword,
@@ -46,8 +44,6 @@ export class AuthService {
     });
 
     const savedPatient = await patient.save();
-
-    // Generate JWT token
     const payload: JwtPayload = {
       sub: savedPatient._id ? savedPatient._id.toString() : '',
       email: savedPatient.email,
@@ -70,19 +66,15 @@ export class AuthService {
   async loginPatient(loginDto: LoginDto) {
     const { email, password } = loginDto;
 
-    // Find patient
     const patient = await this.patientModel.findOne({ email });
     if (!patient) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Verify password
     const isPasswordValid = await bcrypt.compare(password, patient.password);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
-
-    // Generate JWT token
     const payload: JwtPayload = {
       sub: patient._id ? patient._id.toString() : '',
       email: patient.email,
