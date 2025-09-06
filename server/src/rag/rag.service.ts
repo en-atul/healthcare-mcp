@@ -4,18 +4,15 @@ import { AppointmentsService } from '../appointments/appointments.service';
 import { TherapistsService } from '../therapists/therapists.service';
 import { PatientsService } from '../patients/patients.service';
 import { JwtService } from '@nestjs/jwt';
-import { ChromaClient, Collection } from 'chromadb';
-import { OpenAIEmbeddings } from '@langchain/openai';
-import { ChatOpenAI } from '@langchain/openai';
+import { ChromaService } from '../chroma/chroma.service';
+import { OpenAIEmbeddings, ChatOpenAI } from '@langchain/openai';
 import { Document } from 'langchain/document';
 import { UnauthorizedException } from '@nestjs/common';
 
 @Injectable()
 export class RagService implements OnModuleInit {
-  private chromaClient: ChromaClient;
   private embeddings: OpenAIEmbeddings;
   private llm: ChatOpenAI;
-  private collection: Collection;
 
   constructor(
     private readonly configService: ConfigService,
@@ -23,15 +20,11 @@ export class RagService implements OnModuleInit {
     private readonly therapistsService: TherapistsService,
     private readonly patientsService: PatientsService,
     private readonly jwtService: JwtService,
+    private readonly chromaService: ChromaService,
   ) {}
 
   async onModuleInit() {
     try {
-      this.chromaClient = new ChromaClient({
-        host: this.configService.chromaHost,
-        port: this.configService.chromaPort,
-      });
-
       this.embeddings = new OpenAIEmbeddings({
         openAIApiKey: this.configService.openaiApiKey,
         modelName: 'text-embedding-3-small',
@@ -44,8 +37,8 @@ export class RagService implements OnModuleInit {
         maxTokens: this.configService.openaiMaxTokens,
       });
 
-      // Get or create collection
-      await this.initializeCollection();
+      // Initialize ChromaDB service
+      await this.chromaService.initialize();
 
       console.log('✅ RAG Service initialized with ChromaDB');
     } catch (error) {
@@ -53,23 +46,6 @@ export class RagService implements OnModuleInit {
       console.log(
         '⚠️  RAG service will continue without ChromaDB. Start ChromaDB with: docker-compose up chroma',
       );
-    }
-  }
-
-  private async initializeCollection() {
-    try {
-      // Try to get existing collection
-      this.collection = await this.chromaClient.getCollection({
-        name: 'healthcare_conversations',
-      });
-    } catch {
-      // Create new collection if it doesn't exist
-      this.collection = await this.chromaClient.createCollection({
-        name: 'healthcare_conversations',
-        metadata: {
-          description: 'Healthcare conversation context and user data',
-        },
-      });
     }
   }
 
@@ -110,7 +86,7 @@ export class RagService implements OnModuleInit {
     },
   ) {
     try {
-      if (!this.collection) {
+      if (!this.chromaService.collection) {
         console.log(
           '⚠️  ChromaDB not available, skipping conversation storage',
         );
@@ -151,15 +127,26 @@ export class RagService implements OnModuleInit {
         },
       });
 
-      const userEmbedding = await this.embeddings.embedQuery(
-        userDocument.pageContent,
-      );
-      await this.collection.add({
-        ids: [`${patientId}_user_${Date.now()}`],
-        embeddings: [userEmbedding],
-        documents: [userDocument.pageContent],
-        metadatas: [userDocument.metadata],
-      });
+      // const userEmbedding = await this.embeddings.embedQuery(
+      //   userDocument.pageContent,
+      // );
+
+      try {
+        console.log('ids:', [`${patientId}_user_${Date.now()}`]);
+        // console.log('embedding length:', userEmbedding.length);
+        console.log('documents:', [userDocument.pageContent]);
+        console.log('metadatas:', [userDocument.metadata]);
+
+        await this.chromaService.addDocuments(
+          [`${patientId}_user_${Date.now()}`],
+          [userDocument.pageContent],
+          [userDocument.metadata],
+        );
+      } catch (addError) {
+        console.error('❌ Failed to add user message to ChromaDB:', addError);
+        console.log('⚠️  Continuing without storing user message');
+        return; // Exit early if we can't store the user message
+      }
 
       // Store assistant message
       const assistantDocument = new Document({
@@ -173,15 +160,24 @@ export class RagService implements OnModuleInit {
         },
       });
 
-      const assistantEmbedding = await this.embeddings.embedQuery(
-        assistantDocument.pageContent,
-      );
-      await this.collection.add({
-        ids: [`${patientId}_assistant_${Date.now() + 1}`],
-        embeddings: [assistantEmbedding],
-        documents: [assistantDocument.pageContent],
-        metadatas: [assistantDocument.metadata],
-      });
+      // const assistantEmbedding = await this.embeddings.embedQuery(
+      //   assistantDocument.pageContent,
+      // );
+
+      try {
+        await this.chromaService.addDocuments(
+          [`${patientId}_assistant_${Date.now() + 1}`],
+          [assistantDocument.pageContent],
+          [assistantDocument.metadata],
+        );
+      } catch (addError) {
+        console.error(
+          '❌ Failed to add assistant message to ChromaDB:',
+          addError,
+        );
+        console.log('⚠️  Continuing without storing assistant message');
+        return; // Exit early if we can't store the assistant message
+      }
 
       console.log('✅ Conversation context stored in ChromaDB');
     } catch (error) {
@@ -197,7 +193,7 @@ export class RagService implements OnModuleInit {
     metadata: Record<string, unknown> = {},
   ) {
     try {
-      if (!this.collection) {
+      if (!this.chromaService.collection) {
         console.log(
           '⚠️  ChromaDB not available, skipping MCP operation storage',
         );
@@ -356,15 +352,14 @@ export class RagService implements OnModuleInit {
         },
       });
 
-      const embedding = await this.embeddings.embedQuery(document.pageContent);
+      // const embedding = await this.embeddings.embedQuery(document.pageContent);
 
       // Store in ChromaDB with a special prefix for MCP results
-      await this.collection.add({
-        ids: [`mcp_${patientId}_${operation}_${Date.now()}`],
-        embeddings: [embedding],
-        documents: [document.pageContent],
-        metadatas: [document.metadata],
-      });
+      await this.chromaService.addDocuments(
+        [`mcp_${patientId}_${operation}_${Date.now()}`],
+        [document.pageContent],
+        [document.metadata],
+      );
 
       console.log(`✅ MCP operation result stored: ${operation}`);
     } catch (error) {
@@ -379,15 +374,16 @@ export class RagService implements OnModuleInit {
     limit: number = 5,
   ): Promise<Document[]> {
     try {
-      if (!this.collection) {
+      if (!this.chromaService.collection) {
         console.log('⚠️  ChromaDB not available, returning empty context');
         return [];
       }
 
-      const queryEmbedding = await this.embeddings.embedQuery(query);
+      // const queryEmbedding = await this.embeddings.embedQuery(query);
 
-      const results = await this.collection.query({
-        queryEmbeddings: [queryEmbedding],
+      const results = await this.chromaService.collection.query({
+        // queryEmbeddings: [queryEmbedding],
+        queryTexts: [query],
         nResults: limit,
         where: { patientId },
       });
@@ -443,18 +439,21 @@ export class RagService implements OnModuleInit {
     }>
   > {
     try {
-      if (!this.collection) {
+      if (!this.chromaService.collection) {
         console.log('⚠️  ChromaDB not available, returning empty history');
         return [];
       }
 
+      console.log(
+        '🔍 ChromaDB collection available, querying for patient:',
+        patientId,
+      );
+
       // Get all conversation entries for this patient
-      const results = await this.collection.get({
+      const results = await this.chromaService.collection.get({
         where: { patientId },
         limit,
       });
-
-      console.log('-----results', results);
 
       if (!results.documents || results.documents.length === 0) {
         return [];
@@ -515,8 +514,6 @@ export class RagService implements OnModuleInit {
             item !== null && item !== undefined,
         );
 
-      console.log('-----fu', history);
-
       return history;
     } catch (error) {
       console.error('❌ Failed to get conversation history:', error);
@@ -527,20 +524,18 @@ export class RagService implements OnModuleInit {
   // Clear conversation history for a patient (useful for testing)
   async clearConversationHistory(patientId: string) {
     try {
-      if (!this.collection) {
+      if (!this.chromaService.collection) {
         console.log('⚠️  ChromaDB not available, cannot clear history');
         return;
       }
 
       // Delete all documents for this patient
-      const results = await this.collection.get({
+      const results = await this.chromaService.collection.get({
         where: { patientId },
       });
 
       if (results.ids && results.ids.length > 0) {
-        await this.collection.delete({
-          ids: results.ids,
-        });
+        await this.chromaService.deleteDocuments(results.ids);
         console.log(
           `✅ Cleared ${results.ids.length} conversation messages for patient ${patientId}`,
         );
@@ -570,6 +565,15 @@ export class RagService implements OnModuleInit {
   async processMessageWithRag(
     message: string,
     jwtToken: string,
+    conversationHistory?: Array<{
+      type: string;
+      answer: string;
+      action?: string | null;
+      parameters?: Record<string, unknown> | null;
+      actionResult?: Record<string, unknown> | null;
+      rawData?: unknown;
+      timestamp: string;
+    }>,
   ): Promise<{
     response: string;
     action?: string;
@@ -599,11 +603,43 @@ export class RagService implements OnModuleInit {
       // Create system prompt with context
       const systemPrompt = this.createSystemPrompt(contextString);
 
-      // Generate response using LLM
-      const response = await this.llm.invoke([
+      // Build conversation messages for LLM
+      const messages: Array<{ role: string; content: string }> = [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: message },
-      ]);
+      ];
+
+      // Add conversation history if available
+      if (conversationHistory && conversationHistory.length > 0) {
+        console.log(
+          '📚 Conversation history for context:',
+          JSON.stringify(conversationHistory.slice(-5), null, 2),
+        );
+        // Add last 5 messages for context (to avoid token limits)
+        const recentHistory = conversationHistory.slice(-5);
+        for (const msg of recentHistory) {
+          if (msg.type === 'user') {
+            messages.push({ role: 'user', content: msg.answer });
+          } else if (msg.type === 'assistant') {
+            // Include action and parameters in assistant messages for better context
+            let assistantContent = msg.answer;
+            if (msg.action) {
+              assistantContent += `\n[Previous action: ${msg.action}]`;
+              if (msg.parameters) {
+                assistantContent += `\n[Previous parameters: ${JSON.stringify(msg.parameters)}]`;
+              }
+            }
+            messages.push({ role: 'assistant', content: assistantContent });
+          }
+        }
+      } else {
+        console.log('📚 No conversation history available for context');
+      }
+
+      // Add current user message
+      messages.push({ role: 'user', content: message });
+
+      // Generate response using LLM
+      const response = await this.llm.invoke(messages);
 
       console.log('🤖 Raw LLM response:', response.content);
 
@@ -695,7 +731,7 @@ IMPORTANT INSTRUCTIONS:
 
 When the user wants to:
 - List therapists: ALWAYS call list_therapists tool (returns JSON data)
-- Book an appointment: Use therapist ID from cached context if available, otherwise call list_therapists first
+- Book an appointment: ONLY call book_appointment if you have ALL required information (therapistId, appointmentDate, duration). If missing any info, ask the user for it.
 - View appointments: ALWAYS call list_appointments tool (returns JSON data)
 - Cancel an appointment: Use appointment ID from cached context if available, otherwise call list_appointments first
 - View profile: ALWAYS call get_profile tool (returns JSON data)
@@ -710,9 +746,9 @@ Examples:
 ACTION: list_therapists
 PARAMETERS: {}
 
-- For "book appointment":
+- For "book appointment" (ONLY if you have all required info):
 ACTION: book_appointment
-PARAMETERS: {"therapistId": "507f1f77bcf86cd799439011", "appointmentDate": "2024-01-15T10:00:00", "duration": 60}
+PARAMETERS: {"therapistId": "actual_therapist_id", "appointmentDate": "2024-01-15T10:00:00", "duration": 60}
 
 - For "my appointments":
 ACTION: list_appointments
@@ -721,6 +757,104 @@ PARAMETERS: {}
 - For "my profile":
 ACTION: get_profile
 PARAMETERS: {}
+
+CONTEXT EXAMPLE:
+If the conversation flow is:
+1. User: "Book appointment with Dr. David Davis"
+2. Assistant: "Please provide date, time, and duration"
+3. User: "book on 15th September at 5:00 PM for 30 minutes"
+
+Then the assistant should immediately book the appointment with:
+ACTION: book_appointment
+PARAMETERS: {"therapistId": "david_davis_id", "appointmentDate": "2024-09-15T17:00:00", "duration": 30}
+
+ANOTHER EXAMPLE:
+If the conversation flow is:
+1. User: "Book appointment"
+2. Assistant: "Which therapist would you like to book with? Here are available therapists: Dr. David Davis, Dr. Emily Brown..."
+3. User: "Dr. David Davis"
+4. Assistant: "What date and time would you prefer? How long should the appointment be?"
+5. User: "tomorrow at 2 PM for 60 minutes"
+
+Then the assistant should immediately book the appointment with:
+ACTION: book_appointment
+PARAMETERS: {"therapistId": "david_davis_id", "appointmentDate": "2024-09-16T14:00:00", "duration": 60}
+
+CONTEXT DATA EXAMPLE:
+If conversation history contains:
+- actionResult.data: [{"id": "68bbe9a467aead836a2c21e9", "firstName": "David", "lastName": "Davis", ...}]
+- User says: "book with Dr. David Davis"
+
+Then use the ID from context:
+ACTION: book_appointment
+PARAMETERS: {"therapistId": "68bbe9a467aead836a2c21e9", "appointmentDate": "...", "duration": ...}
+
+CONTEXT USAGE EXAMPLE:
+If conversation history shows therapist data was retrieved and user says "book appointment":
+- DO NOT respond with: "Which therapist would you like to book with? Here are the available therapists: Dr. John Smith, Dr. Sarah Johnson..."
+- DO respond with: "Which therapist would you like to book with? I can see the available therapists from our previous conversation."
+
+CRITICAL: When a user provides information in response to your questions, you MUST:
+1. Connect their response with the previous context
+2. Use the information they provided
+3. Proceed with the action if you have all required information
+4. DO NOT ask for the same information again
+
+CONTEXT CONNECTION RULES:
+- If you asked "Which therapist would you like to book with?" and user responds with a therapist name, use that therapist
+- If you asked "What date and time would you prefer?" and user responds with date/time, use that date/time
+- If you asked "How long should the appointment be?" and user responds with duration, use that duration
+- ALWAYS combine information from multiple messages in the conversation
+- NEVER ask for information that has already been provided in the conversation
+
+IMPORTANT: For appointment booking, you MUST have:
+- therapistId: The exact ID of the therapist
+- appointmentDate: Date and time in ISO format (e.g., "2024-01-15T10:00:00")
+- duration: Duration in minutes (15-180)
+
+CONTEXT AWARENESS: 
+- ALWAYS review the conversation history to understand what information has already been provided
+- If the user has already provided some information in previous messages, use that information
+- If the user mentions a therapist name, look for their ID in the context
+- If the user provides a date/time, convert it to ISO format (e.g., "15th September at 5:00 PM" → "2024-09-15T17:00:00")
+- Only ask for information that is still missing
+- If you have all required information, proceed with booking
+- When a user responds to your questions, connect their response with the previous context
+- For appointment booking, if you asked for details and the user provided them, use those details immediately
+- NEVER ask for the same information twice in the same conversation
+
+CONTEXT DATA USAGE:
+- If conversation history contains therapist data in actionResult/rawData, use those therapist IDs directly
+- If user says "book with Dr. David Davis", find his ID from the context data
+- If user says "book appointment" after therapist list was shown, ask which specific therapist from the list
+- Use the exact therapist IDs from the context data, not generic names
+
+CRITICAL CONTEXT RULES:
+- If conversation history shows therapist data was already retrieved (actionResult.data contains therapist list), DO NOT ask for therapist list again
+- If user says "book appointment" and therapist data exists in context, ask which specific therapist from the existing list
+- If user mentions a therapist name, immediately look up their ID from the context data
+- NEVER repeat information that's already in the conversation history
+
+If the user says "book appointment" without providing these details, ask them:
+1. Which therapist would you like to book with? (provide therapist list if needed)
+2. What date and time would you prefer?
+3. How long should the appointment be? (15-180 minutes)
+
+SPECIAL CASE: If conversation history contains therapist data (actionResult.data with therapist list):
+- DO NOT ask for therapist list again
+- Instead ask: "Which therapist would you like to book with? I can see the available therapists from our previous conversation."
+- Then ask for date/time and duration
+
+BOOKING FLOW WITH CONTEXT:
+1. If user says "book appointment" and therapist data exists in context:
+   - Ask: "Which therapist would you like to book with? I can see the available therapists from our previous conversation."
+   - DO NOT repeat the therapist list
+2. If user mentions a specific therapist name:
+   - Look up their ID from the context data
+   - Ask for date/time and duration
+3. If user provides all details:
+   - Use the therapist ID from context
+   - Proceed with booking
 
 DO NOT provide natural language responses for data requests. ALWAYS use the ACTION/PARAMETERS format.`;
   }
@@ -768,8 +902,51 @@ DO NOT provide natural language responses for data requests. ALWAYS use the ACTI
       };
     }
 
-    // Fallback: Try to detect common phrases and map them to actions
+    // Check if the response is asking for more information (no action provided)
     const lowerResponse = response.toLowerCase();
+    const isAskingForInfo =
+      lowerResponse.includes('which therapist') ||
+      lowerResponse.includes('what date') ||
+      lowerResponse.includes('what time') ||
+      lowerResponse.includes('how long') ||
+      lowerResponse.includes('please provide') ||
+      lowerResponse.includes('i need') ||
+      lowerResponse.includes('missing') ||
+      lowerResponse.includes('required') ||
+      lowerResponse.includes('need more details') ||
+      lowerResponse.includes('few more details') ||
+      lowerResponse.includes('provide the following details');
+
+    // Check if the response is repeating therapist list when it should use context
+    const isRepeatingTherapistList =
+      lowerResponse.includes('here are the available therapists') ||
+      lowerResponse.includes('available therapists:') ||
+      (lowerResponse.includes('dr.') &&
+        lowerResponse.includes('specialization'));
+
+    if (isAskingForInfo && !isRepeatingTherapistList) {
+      console.log(
+        '✅ LLM is asking for more information, returning response without action',
+      );
+      return {
+        response: cleanResponse,
+        action: undefined,
+        parameters: undefined,
+      };
+    }
+
+    if (isRepeatingTherapistList) {
+      console.log(
+        '⚠️  LLM is repeating therapist list instead of using context, returning response without action',
+      );
+      return {
+        response: cleanResponse,
+        action: undefined,
+        parameters: undefined,
+      };
+    }
+
+    // Fallback: Try to detect common phrases and map them to actions
     if (
       lowerResponse.includes('list') &&
       (lowerResponse.includes('therapist') || lowerResponse.includes('doctor'))
@@ -868,12 +1045,13 @@ DO NOT provide natural language responses for data requests. ALWAYS use the ACTI
   // Sanitize metadata for ChromaDB compatibility
   private sanitizeMetadata(
     metadata: Record<string, unknown>,
-  ): Record<string, string | number | boolean | null> {
-    const sanitized: Record<string, string | number | boolean | null> = {};
+  ): Record<string, string | number | boolean> {
+    const sanitized: Record<string, string | number | boolean> = {};
 
     for (const [key, value] of Object.entries(metadata)) {
+      // Skip null and undefined values entirely
       if (value === null || value === undefined) {
-        sanitized[key] = null;
+        continue;
       } else if (
         typeof value === 'string' ||
         typeof value === 'number' ||

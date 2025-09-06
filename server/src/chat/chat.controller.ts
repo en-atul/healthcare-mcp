@@ -79,11 +79,30 @@ export class ChatController {
         throw new Error('JWT token not found in request');
       }
 
+      // Get recent conversation history for context
+      let patientId: string;
+      try {
+        patientId = this.extractPatientIdFromToken(jwtToken);
+      } catch {
+        throw new Error('Invalid JWT token');
+      }
+      console.log('🔍 Getting conversation history for patient:', patientId);
+      const conversationHistory = await this.ragService.getConversationHistory(
+        patientId,
+        10, // Get last 10 messages for context
+      );
+      console.log(
+        '📚 Retrieved conversation history:',
+        conversationHistory.length,
+        'messages',
+      );
+
       // Step 1: Process message with RAG
       console.log('🧠 RAG processing message...');
       const ragResponse = await this.ragService.processMessageWithRag(
         message,
         jwtToken,
+        conversationHistory,
       );
       console.log('📊 RAG response:', JSON.stringify(ragResponse, null, 2));
       console.log('🔍 RAG action:', ragResponse.action);
@@ -133,16 +152,24 @@ export class ChatController {
         timestamp: new Date().toISOString(),
       };
 
-      await this.ragService.storeConversationContext(
-        this.extractPatientIdFromToken(jwtToken),
-        message,
-        finalResponse,
-        {
-          action: ragResponse.action,
-          parameters: ragResponse.parameters,
-        },
-        fullChatResponse,
-      );
+      console.log('💾 Storing conversation context for patient:', patientId);
+      try {
+        await this.ragService.storeConversationContext(
+          patientId,
+          message,
+          finalResponse,
+          {
+            action: ragResponse.action,
+            parameters: ragResponse.parameters,
+          },
+          fullChatResponse,
+        );
+        console.log('✅ Conversation context stored successfully');
+      } catch (storageError) {
+        console.error('❌ Failed to store conversation context:', storageError);
+        console.log('⚠️  Continuing without storing conversation context');
+        // Don't throw the error - let the conversation continue
+      }
 
       return {
         type: 'assistant',

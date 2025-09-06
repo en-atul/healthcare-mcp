@@ -32,7 +32,8 @@ export default function Dashboard() {
       
       // Note: Chat history is loaded by the ChatInterface component
     }
-  }, [isAuthenticated, user, token, fetchAppointments]); // Added fetchAppointments back to dependencies
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAuthenticated, user, token]); // fetchAppointments intentionally excluded to prevent infinite calls
 
   if (!isHydrated || !isAuthenticated || !user) {
     return (
