@@ -10,7 +10,7 @@ import {
 } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent,  CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Select,
   SelectContent,
@@ -22,6 +22,7 @@ import { Therapist, useAppStore } from '@/stores/app-store';
 import { toast } from 'sonner';
 import { Calendar, Clock, User, Star, Loader2 } from 'lucide-react';
 import { format, addDays } from 'date-fns';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 
 export function AppointmentModal() {
   const {
@@ -81,9 +82,24 @@ export function AppointmentModal() {
 
   // Generate available time slots
   const timeSlots = [
-    '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
-    '12:00', '12:30', '13:00', '13:30', '14:00', '14:30',
-    '15:00', '15:30', '16:00', '16:30', '17:00', '17:30'
+    '09:00',
+    '09:30',
+    '10:00',
+    '10:30',
+    '11:00',
+    '11:30',
+    '12:00',
+    '12:30',
+    '13:00',
+    '13:30',
+    '14:00',
+    '14:30',
+    '15:00',
+    '15:30',
+    '16:00',
+    '16:30',
+    '17:00',
+    '17:30',
   ];
 
   // Generate available dates (next 30 days)
@@ -92,7 +108,7 @@ export function AppointmentModal() {
     return {
       value: format(date, 'yyyy-MM-dd'),
       label: format(date, 'MMM dd, yyyy'),
-      day: format(date, 'EEEE')
+      day: format(date, 'EEEE'),
     };
   });
 
@@ -119,35 +135,80 @@ export function AppointmentModal() {
               <Select
                 value={selectedTherapist?._id || ''}
                 onValueChange={(value) => {
-                  const therapist = therapists.find(t => t._id === value);
+                  const therapist = therapists.find((t) => t._id === value);
                   setSelectedTherapist(therapist || undefined);
                 }}
               >
                 <SelectTrigger className="h-14 w-full">
                   <SelectValue placeholder="Choose a therapist">
                     {selectedTherapist && (
-                      <span className="font-medium text-sm">
-                        <span className="text-foreground">Dr. {selectedTherapist.firstName} {selectedTherapist.lastName}</span>
-                        <span className="text-muted-foreground"> • {selectedTherapist.specialization} • {selectedTherapist.experience} years exp</span>
+                      <span className="font-medium text-sm flex gap-x-2">
+                        <span>
+                          <Avatar className="h-5 w-5 border border-gray-300">
+                            <AvatarImage
+                              src={selectedTherapist.photo}
+                              alt={`Dr. ${selectedTherapist.firstName}`}
+                            />
+                            <AvatarFallback className="bg-primary text-primary-foreground">
+                              {selectedTherapist.firstName
+                                ? selectedTherapist.firstName
+                                    .split(' ')
+                                    .map((n) => n[0])
+                                    .join('')
+                                : 'DR'}
+                            </AvatarFallback>
+                          </Avatar>
+                        </span>
+                        <span className="text-foreground">
+                          Dr. {selectedTherapist.firstName}{' '}
+                          {selectedTherapist.lastName}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {' '}
+                          • {selectedTherapist.specialization}
+                        </span>
                       </span>
                     )}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {therapists.map((therapist) => (
-                    <SelectItem key={therapist._id} value={therapist._id} className="py-3">
-                      <div className="flex items-center justify-between w-full">
+                    <SelectItem
+                      key={therapist._id}
+                      value={therapist._id}
+                      className="py-3"
+                    >
+                      <div className="flex items-center justify-between w-full gap-x-2">
+                        <div>
+                          <Avatar className="h-7 w-7 border border-gray-300">
+                            <AvatarImage
+                              src={therapist.photo}
+                              alt={`Dr. ${therapist.firstName}`}
+                            />
+                            <AvatarFallback className="bg-primary text-primary-foreground">
+                              {therapist.firstName
+                                ? therapist.firstName
+                                    .split(' ')
+                                    .map((n) => n[0])
+                                    .join('')
+                                : 'DR'}
+                            </AvatarFallback>
+                          </Avatar>
+                        </div>
                         <div className="flex flex-col">
                           <span className="font-medium text-sm">
                             Dr. {therapist.firstName} {therapist.lastName}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {therapist.specialization} • {therapist.experience} years exp
+                            {therapist.specialization} • {therapist.experience}{' '}
+                            years exp
                           </span>
                         </div>
                         <div className="flex items-center gap-1 ml-2">
                           <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
-                          <span className="text-xs font-medium">{therapist.rating}</span>
+                          <span className="text-xs font-medium">
+                            {therapist.rating}
+                          </span>
                         </div>
                       </div>
                     </SelectItem>
@@ -162,26 +223,36 @@ export function AppointmentModal() {
             {/* Date Selection */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Select Date</label>
-              <Select
-                value={selectedDate}
-                onValueChange={setSelectedDate}
-              >
+              <Select value={selectedDate} onValueChange={setSelectedDate}>
                 <SelectTrigger className="h-14 w-full">
                   <SelectValue placeholder="Choose a date">
                     {selectedDate && (
                       <span className="font-medium text-sm">
-                        <span className="text-foreground">{format(new Date(selectedDate), 'MMM dd, yyyy')}</span>
-                        <span className="text-muted-foreground"> • {format(new Date(selectedDate), 'EEEE')}</span>
+                        <span className="text-foreground">
+                          {format(new Date(selectedDate), 'MMM dd, yyyy')}
+                        </span>
+                        <span className="text-muted-foreground">
+                          {' '}
+                          • {format(new Date(selectedDate), 'EEEE')}
+                        </span>
                       </span>
                     )}
                   </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {availableDates.map((date) => (
-                    <SelectItem key={date.value} value={date.value} className="py-3">
+                    <SelectItem
+                      key={date.value}
+                      value={date.value}
+                      className="py-3"
+                    >
                       <div className="flex flex-col">
-                        <span className="font-medium text-sm">{date.label}</span>
-                        <span className="text-xs text-muted-foreground">{date.day}</span>
+                        <span className="font-medium text-sm">
+                          {date.label}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {date.day}
+                        </span>
                       </div>
                     </SelectItem>
                   ))}
@@ -232,8 +303,13 @@ export function AppointmentModal() {
                 <div className="flex items-center gap-2">
                   <User className="h-4 w-4 text-muted-foreground" />
                   <div>
-                    <p className="text-sm font-medium">Dr. {selectedTherapist.firstName} {selectedTherapist.lastName}</p>
-                    <p className="text-sm text-muted-foreground">{selectedTherapist.specialization}</p>
+                    <p className="text-sm font-medium">
+                      Dr. {selectedTherapist.firstName}{' '}
+                      {selectedTherapist.lastName}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {selectedTherapist.specialization}
+                    </p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -254,7 +330,12 @@ export function AppointmentModal() {
           <div className="flex gap-3 pt-4">
             <Button
               onClick={handleBookAppointment}
-              disabled={!selectedTherapist || !selectedDate || !selectedTime || isBooking}
+              disabled={
+                !selectedTherapist ||
+                !selectedDate ||
+                !selectedTime ||
+                isBooking
+              }
               className="flex-1"
             >
               {isBooking ? (

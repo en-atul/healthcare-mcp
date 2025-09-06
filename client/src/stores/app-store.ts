@@ -24,6 +24,7 @@ export interface Therapist {
   experience: number;
   rating: number;
   availableSlots?: string[];
+  photo: string;
 }
 
 export interface ChatMessage {
@@ -148,8 +149,9 @@ export const useAppStore = create<AppState>((set, get) => ({
       const newMessages = [...state.chatMessages, message];
       // Sort to ensure chronological order (oldest first)
       return {
-        chatMessages: newMessages.sort((a, b) => 
-          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        chatMessages: newMessages.sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
         ),
       };
     }),
@@ -308,12 +310,16 @@ export const useAppStore = create<AppState>((set, get) => ({
             (msg) => !existingIds.has(msg.id),
           );
 
-          const combinedMessages = [...state.chatMessages, ...uniqueNewMessages];
+          const combinedMessages = [
+            ...state.chatMessages,
+            ...uniqueNewMessages,
+          ];
           // Sort to ensure chronological order (oldest first)
-          const sortedCombinedMessages = combinedMessages.sort((a, b) => 
-            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          const sortedCombinedMessages = combinedMessages.sort(
+            (a, b) =>
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
           );
-          
+
           return {
             chatMessages: sortedCombinedMessages,
             chatPage: page,
@@ -322,8 +328,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         });
       } else {
         // Replace messages (initial load) - sort to ensure chronological order (oldest first)
-        const sortedMessages = newMessages.sort((a, b) => 
-          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        const sortedMessages = newMessages.sort(
+          (a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
         );
         set({
           chatMessages: sortedMessages,
