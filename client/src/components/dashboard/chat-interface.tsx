@@ -2,7 +2,6 @@
 
 import { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -10,6 +9,7 @@ import { useAppStore } from '@/stores/app-store';
 import { useAuthStore } from '@/stores/auth-store';
 import { toast } from 'sonner';
 import InfiniteScroll from 'react-infinite-scroll-component';
+import TextareaAutosize from 'react-textarea-autosize';
 import {
   Send,
   Bot,
@@ -559,15 +559,23 @@ export function ChatInterface() {
 
       {/* Input - Fixed at bottom */}
       <div className="p-4 border-t bg-muted/50">
-        <form onSubmit={handleSubmit} className="flex gap-2">
-          <Input
+        <form onSubmit={handleSubmit} className="flex gap-2 items-end">
+          <TextareaAutosize
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask me anything about your health..."
             disabled={isChatLoading}
-            className="flex-1"
+            className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            minRows={1}
+            maxRows={4}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e);
+              }
+            }}
           />
-          <Button type="submit" disabled={!input.trim() || isChatLoading}>
+          <Button type="submit" disabled={!input.trim() || isChatLoading} className="h-10 w-10 p-0">
             <Send className="h-4 w-4" />
           </Button>
         </form>
