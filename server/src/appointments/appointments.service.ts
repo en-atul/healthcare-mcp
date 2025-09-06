@@ -47,29 +47,17 @@ export class AppointmentsService {
   }
 
   async findOne(id: string) {
-    const appointment = await this.appointmentModel
+    return this.appointmentModel
       .findById(id)
       .populate('patientId', 'firstName lastName email photo')
       .populate('therapistId', 'firstName lastName specialization photo');
-
-    if (!appointment) {
-      throw new NotFoundException('Appointment not found');
-    }
-
-    return appointment;
   }
 
   async update(id: string, updateAppointmentDto: UpdateAppointmentDto) {
-    const appointment = await this.appointmentModel
+    return this.appointmentModel
       .findByIdAndUpdate(id, updateAppointmentDto, { new: true })
       .populate('patientId', 'firstName lastName email photo')
       .populate('therapistId', 'firstName lastName specialization photo');
-
-    if (!appointment) {
-      throw new NotFoundException('Appointment not found');
-    }
-
-    return appointment;
   }
 
   async remove(id: string) {

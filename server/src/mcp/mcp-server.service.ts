@@ -207,9 +207,13 @@ export class McpServerService {
 
       const appointment = await this.appointmentsService.findOne(appointmentId);
 
+      if (!appointment) {
+        throw new Error('Appointment not found');
+      }
+
       if (
-        appointment.patientId._id &&
-        appointment.patientId._id.toString() !== patientId
+        (appointment.patientId as any)._id &&
+        String((appointment.patientId as any)._id) !== patientId
       ) {
         throw new Error('You can only cancel your own appointments');
       }
@@ -237,7 +241,9 @@ export class McpServerService {
         id: appointment._id ? appointment._id.toString() : 'unknown',
         date: appointment.appointmentDate,
         duration: appointment.duration,
-        therapistId: appointment.therapistId._id ? appointment.therapistId._id.toString() : 'unknown',
+        therapistId: (appointment.therapistId as any)._id
+          ? String((appointment.therapistId as any)._id)
+          : 'unknown',
         therapistName: `Dr. ${therapist.firstName} ${therapist.lastName}`,
         therapistPhoto: therapist.photo,
         patientName: `${patient.firstName} ${patient.lastName}`,

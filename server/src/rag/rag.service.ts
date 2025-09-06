@@ -516,8 +516,9 @@ export class RagService implements OnModuleInit {
         );
 
       // Sort by timestamp to ensure chronological order (oldest first)
-      const sortedHistory = history.sort((a, b) => 
-        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      const sortedHistory = history.sort(
+        (a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
       );
 
       // Apply limit after sorting to ensure we get the most recent messages

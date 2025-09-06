@@ -29,11 +29,9 @@ export default function Dashboard() {
       fetchAppointments().catch((error) => {
         console.error('Failed to load appointments:', error);
       });
-      
-      // Note: Chat history is loaded by the ChatInterface component
-    }
+          }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isAuthenticated, user, token]); // fetchAppointments intentionally excluded to prevent infinite calls
+  }, [isAuthenticated, user, token]); 
 
   if (!isHydrated || !isAuthenticated || !user) {
     return (
@@ -47,15 +45,13 @@ export default function Dashboard() {
     <div className="min-h-screen bg-white">
       <Header />
       
-      <main className="container mx-auto px-4 py-4 h-[calc(100vh-5rem)]">
-        <div className="grid grid-cols-1 lg:grid-cols-[30%_70%] gap-6 h-full">
-          {/* Appointments Panel - 30% */}
-          <div className="h-full overflow-hidden">
+      <main className="container mx-auto px-4 py-4 h-[calc(100vh-5rem)] min-h-0">
+        <div className="grid grid-cols-1 lg:grid-cols-[minmax(300px,30%)_1fr] gap-6 h-full min-h-0">
+          <div className="h-full overflow-hidden min-w-0">
             <AppointmentsPanel />
           </div>
           
-          {/* Chat Interface - 70% */}
-          <div className="h-full overflow-hidden">
+          <div className="h-full overflow-hidden min-w-0">
             <ChatInterface />
           </div>
         </div>

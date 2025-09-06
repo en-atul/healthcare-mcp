@@ -141,7 +141,7 @@ export function ChatInterface() {
           {therapistsData.data && therapistsData.data.length > 0 ? (
             <div className="grid gap-2">
               {therapistsData.data.map((therapist) => (
-                <Card key={therapist.id} className="p-3 !shadow-none">
+                <Card key={therapist.id} className="p-3 !shadow-none border-0 bg-card/50 hover:bg-card/80 transition-colors">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-12 w-12">
@@ -322,12 +322,10 @@ export function ChatInterface() {
       return (
         <div className="space-y-2">
           <p>{profileData.message}</p>
-          <Card className="p-3">
+          <Card className="p-3 shadow-none border-0 bg-card/50">
             <div className="flex items-center gap-2">
-              <UserCheck className="h-4 w-4" />
               <div>
-                <p className="font-medium">👤 Your Profile</p>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-sm text-muted-foreground mb-1">
                   {profileData.data.firstName} {profileData.data.lastName}
                 </p>
                 <p className="text-sm text-muted-foreground">
@@ -406,20 +404,18 @@ export function ChatInterface() {
   };
 
   return (
-    <div className="h-full flex flex-col border rounded-lg bg-card overflow-hidden">
-      {/* Chat Header */}
-      <div className="flex items-center gap-2 p-4 border-b bg-muted/50">
-        <Bot className="h-5 w-5 text-primary" />
-        <h2 className="font-semibold">Health Assistant</h2>
-        <Badge variant="secondary" className="ml-auto">
+    <div className="h-full flex flex-col border rounded-lg bg-card overflow-hidden min-w-0">
+      <div className="flex items-center gap-2 p-4 border-b flex-shrink-0">
+        <Bot className="h-5 w-5 text-primary flex-shrink-0" />
+        <h2 className="font-semibold truncate">Health Assistant</h2>
+        <Badge variant="secondary" className="ml-auto flex-shrink-0">
           AI Powered
         </Badge>
       </div>
 
-      {/* Messages - Fixed height with scroll */}
       <div
         id="scrollableDiv"
-        className="flex-1 overflow-y-auto p-4 min-h-0"
+        className="flex-1 overflow-y-auto p-4 min-h-0 custom-scrollbar"
         onScroll={handleScroll}
       >
         <InfiniteScroll
@@ -557,15 +553,14 @@ export function ChatInterface() {
         </InfiniteScroll>
       </div>
 
-      {/* Input - Fixed at bottom */}
-      <div className="p-4 border-t bg-muted/50">
-        <form onSubmit={handleSubmit} className="flex gap-2 items-end">
+      <div className="p-4 border-t flex-shrink-0">
+        <form onSubmit={handleSubmit} className="flex gap-2 items-end min-w-0">
           <TextareaAutosize
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Ask me anything about your health..."
             disabled={isChatLoading}
-            className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+            className="flex-1 min-h-[40px] max-h-[120px] resize-none rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 min-w-0"
             minRows={1}
             maxRows={4}
             onKeyDown={(e) => {
@@ -575,7 +570,7 @@ export function ChatInterface() {
               }
             }}
           />
-          <Button type="submit" disabled={!input.trim() || isChatLoading} className="h-10 w-10 p-0">
+          <Button type="submit" disabled={!input.trim() || isChatLoading} className="h-10 w-10 p-0 flex-shrink-0">
             <Send className="h-4 w-4" />
           </Button>
         </form>

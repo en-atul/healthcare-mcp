@@ -41,8 +41,7 @@ export class RegisterPatientDto {
   @IsString()
   address?: string;
 
-  @IsOptional()
   @IsString()
   @IsIn(['male', 'female'])
-  gender?: 'male' | 'female';
+  gender: 'male' | 'female';
 }

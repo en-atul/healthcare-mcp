@@ -29,13 +29,10 @@ export class AuthService {
       throw new ConflictException('Patient with this email already exists');
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Generate photo based on gender (default to 'male' if not provided)
-    const userGender = gender || 'male';
     const photo = await this.randomUserService.getRandomUserPhoto(
-      userGender,
+      gender,
       'medium',
     );
 
@@ -43,6 +40,7 @@ export class AuthService {
     const patient = new this.patientModel({
       email,
       password: hashedPassword,
+      gender,
       photo,
       ...rest,
     });

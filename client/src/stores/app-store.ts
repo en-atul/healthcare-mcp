@@ -2,17 +2,28 @@ import { create } from 'zustand';
 
 export interface Appointment {
   _id: string;
-  therapistId: string;
-  therapistName?: string;
-  therapistPhoto?: string;
-  patientId: string;
-  patientName?: string;
-  patientPhoto?: string;
+  therapistId: {
+    _id: string;
+    firstName: string;
+    lastName: string;
+    specialization: string;
+    photo: string;
+  };
+  patientId: {
+    _id: string;
+    email: string;
+    firstName: string;
+    lastName: string;
+    photo: string;
+  };
   appointmentDate: string;
   duration: number;
   status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
   notes?: string;
   cancellationReason?: string;
+  createdAt: string;
+  updatedAt: string;
+  __v: number;
 }
 
 export interface Therapist {

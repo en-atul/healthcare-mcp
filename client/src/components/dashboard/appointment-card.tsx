@@ -28,7 +28,7 @@ interface AppointmentCardProps {
 
 const AppointmentCard: FC<AppointmentCardProps> = ({data:appointment, handleQuickAction}) => {
   return (
-    <Card key={appointment.id} className="p-3 !shadow-none">
+    <Card key={appointment.id} className="p-3 !shadow-none border-0 bg-card/50 hover:bg-card/80 transition-colors">
       <div className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <div className="relative">

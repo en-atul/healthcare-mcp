@@ -19,7 +19,7 @@ interface AuthState {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (name: string, email: string, password: string) => Promise<void>;
+  register: (name: string, email: string, password: string, gender: 'male' | 'female') => Promise<void>;
   logout: () => void;
   setUser: (user: User) => void;
   setToken: (token: string) => void;
@@ -53,13 +53,13 @@ export const useAuthStore = create<AuthState>()(
         }
       },
 
-      register: async (name: string, email: string, password: string) => {
+      register: async (name: string, email: string, password: string, gender: 'male' | 'female') => {
         set({ isLoading: true });
         try {
           const { apiClient } = await import('@/lib/api-client');
           const [firstName, ...lastNameParts] = name.split(' ');
           const lastName = lastNameParts.join(' ') || '';
-          const data = await apiClient.register(firstName, lastName, email, password);
+          const data = await apiClient.register(firstName, lastName, email, password, { gender });
           set({
             user: data.patient,
             token: data.access_token,
