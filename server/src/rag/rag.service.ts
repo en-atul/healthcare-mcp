@@ -719,6 +719,7 @@ export class RagService implements OnModuleInit {
   }
 
   private createSystemPrompt(context: string): string {
+    const currentYear = new Date().getFullYear();
     return `You are a helpful healthcare assistant. You have access to the following context:
 
 ${context}
@@ -755,7 +756,7 @@ PARAMETERS: {}
 
 - For "book appointment" (ONLY if you have all required info):
 ACTION: book_appointment
-PARAMETERS: {"therapistId": "actual_therapist_id", "appointmentDate": "2024-01-15T10:00:00", "duration": 60}
+PARAMETERS: {"therapistId": "actual_therapist_id", "appointmentDate": "${currentYear}-01-15T10:00:00", "duration": 60}
 
 - For "my appointments":
 ACTION: list_appointments
@@ -773,7 +774,7 @@ If the conversation flow is:
 
 Then the assistant should immediately book the appointment with:
 ACTION: book_appointment
-PARAMETERS: {"therapistId": "david_davis_id", "appointmentDate": "2024-09-15T17:00:00", "duration": 30}
+PARAMETERS: {"therapistId": "david_davis_id", "appointmentDate": "${currentYear}-09-15T17:00:00", "duration": 30}
 
 ANOTHER EXAMPLE:
 If the conversation flow is:
@@ -785,7 +786,7 @@ If the conversation flow is:
 
 Then the assistant should immediately book the appointment with:
 ACTION: book_appointment
-PARAMETERS: {"therapistId": "david_davis_id", "appointmentDate": "2024-09-16T14:00:00", "duration": 60}
+PARAMETERS: {"therapistId": "david_davis_id", "appointmentDate": "${currentYear}-09-16T14:00:00", "duration": 60}
 
 CONTEXT DATA EXAMPLE:
 If conversation history contains:
@@ -816,14 +817,20 @@ CONTEXT CONNECTION RULES:
 
 IMPORTANT: For appointment booking, you MUST have:
 - therapistId: The exact ID of the therapist
-- appointmentDate: Date and time in ISO format (e.g., "2024-01-15T10:00:00")
+- appointmentDate: Date and time in ISO format (e.g., "${currentYear}-01-15T10:00:00")
 - duration: Duration in minutes (15-180)
+
+CRITICAL DATE HANDLING:
+- ALWAYS use the current year (${currentYear}) when parsing dates
+- If user says "tomorrow", "next week", "next month", calculate from current date
+- If user provides a date without year, assume current year (${currentYear})
+- Convert relative dates (tomorrow, next week) to absolute dates with current year
 
 CONTEXT AWARENESS: 
 - ALWAYS review the conversation history to understand what information has already been provided
 - If the user has already provided some information in previous messages, use that information
 - If the user mentions a therapist name, look for their ID in the context
-- If the user provides a date/time, convert it to ISO format (e.g., "15th September at 5:00 PM" → "2024-09-15T17:00:00")
+- If the user provides a date/time, convert it to ISO format (e.g., "15th September at 5:00 PM" → "${currentYear}-09-15T17:00:00")
 - Only ask for information that is still missing
 - If you have all required information, proceed with booking
 - When a user responds to your questions, connect their response with the previous context
