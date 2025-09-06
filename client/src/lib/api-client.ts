@@ -140,11 +140,21 @@ class ApiClient {
   // Chat endpoints
   async sendChatMessage(message: string) {
     const response = await this.client.post('/chat', { message });
+    
+    // For actions that return structured data, use actionResult format
+    let data = response.data.rawData || response.data.actionResult;
+    
+    // If we have actionResult with the proper structure, use that
+    if (response.data.actionResult && typeof response.data.actionResult === 'object') {
+      data = response.data.actionResult;
+    }
+    
     return {
       response: response.data.answer,
-      type: response.data.action,
+      type: response.data.type || 'assistant', // Use server-provided type or default to assistant
       action: response.data.action,
-      data: response.data.rawData || response.data.actionResult,
+      data: data,
+      parameters: response.data.parameters,
     };
   }
 
@@ -156,7 +166,9 @@ class ApiClient {
     const response = await this.client.get(
       `/chat/history${params.toString() ? `?${params.toString()}` : ''}`,
     );
-    return response.data;
+    
+    // Chat history now returns the array directly
+    return response.data || [];
   }
 
   // Patient endpoints

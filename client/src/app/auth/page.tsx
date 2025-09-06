@@ -20,7 +20,7 @@ function AuthContent() {
     <div className="min-h-screen flex items-center justify-center bg-white p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-black to-gray-300 bg-clip-text text-transparent mb-2">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-black to-gray-400 bg-clip-text text-transparent mb-2">
             Healthcare MCP
           </h1>
           <p className="text-gray-600 text-sm">

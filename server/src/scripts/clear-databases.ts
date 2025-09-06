@@ -54,9 +54,21 @@ async function clearMongoDB() {
     console.error('❌ Error clearing MongoDB:', error);
     throw error;
   } finally {
-    if (mongoose.connection.readyState === ConnectionStates.connected) {
-      await mongoose.disconnect();
-      console.log('🔌 MongoDB connection closed');
+    try {
+      if (
+        mongoose.connection &&
+        mongoose.connection.readyState === ConnectionStates.connected
+      ) {
+        await mongoose.disconnect();
+        console.log('🔌 MongoDB connection closed');
+      }
+    } catch (disconnectError) {
+      console.log(
+        '⚠️  Error during disconnect:',
+        disconnectError instanceof Error
+          ? disconnectError.message
+          : 'Unknown error',
+      );
     }
   }
 }

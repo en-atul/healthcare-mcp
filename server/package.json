@@ -21,15 +21,12 @@
     "seed:therapists": "ts-node src/scripts/seed-therapists.ts",
     "seed:patients": "ts-node src/scripts/seed-patients.ts",
     "clear:databases": "ts-node src/scripts/clear-databases.ts",
-    "mcp:server": "ts-node src/mcp/mcp-server.ts",
-    "test:mcp:http": "node test-mcp-http.js",
-    "test:rag": "node test-rag.js",
-    "test:chat:history": "node test-chat-history.js",
-    "test:action:detection": "node test-action-detection.js"
+    "mcp:server": "ts-node src/mcp/mcp-server.ts"
   },
   "dependencies": {
     "@chroma-core/default-embed": "^0.1.8",
-    "@langchain/community": "^0.3.54",
+    "@chroma-core/openai": "^0.1.7",
+    "@langchain/community": "^0.3.55",
     "@langchain/openai": "^0.6.11",
     "@modelcontextprotocol/sdk": "^1.17.5",
     "@nestjs/common": "^11.0.1",

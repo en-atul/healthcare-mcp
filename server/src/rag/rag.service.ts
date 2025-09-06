@@ -4,18 +4,15 @@ import { AppointmentsService } from '../appointments/appointments.service';
 import { TherapistsService } from '../therapists/therapists.service';
 import { PatientsService } from '../patients/patients.service';
 import { JwtService } from '@nestjs/jwt';
-import { ChromaClient, Collection } from 'chromadb';
-import { OpenAIEmbeddings } from '@langchain/openai';
-import { ChatOpenAI } from '@langchain/openai';
+import { ChromaService } from '../chroma/chroma.service';
+import { OpenAIEmbeddings, ChatOpenAI } from '@langchain/openai';
 import { Document } from 'langchain/document';
 import { UnauthorizedException } from '@nestjs/common';
 
 @Injectable()
 export class RagService implements OnModuleInit {
-  private chromaClient: ChromaClient;
   private embeddings: OpenAIEmbeddings;
   private llm: ChatOpenAI;
-  private collection: Collection;
 
   constructor(
     private readonly configService: ConfigService,
@@ -23,15 +20,11 @@ export class RagService implements OnModuleInit {
     private readonly therapistsService: TherapistsService,
     private readonly patientsService: PatientsService,
     private readonly jwtService: JwtService,
+    private readonly chromaService: ChromaService,
   ) {}
 
   async onModuleInit() {
     try {
-      this.chromaClient = new ChromaClient({
-        host: this.configService.chromaHost,
-        port: this.configService.chromaPort,
-      });
-
       this.embeddings = new OpenAIEmbeddings({
         openAIApiKey: this.configService.openaiApiKey,
         modelName: 'text-embedding-3-small',
@@ -44,8 +37,7 @@ export class RagService implements OnModuleInit {
         maxTokens: this.configService.openaiMaxTokens,
       });
 
-      // Get or create collection
-      await this.initializeCollection();
+      await this.chromaService.initialize();
 
       console.log('✅ RAG Service initialized with ChromaDB');
     } catch (error) {
@@ -53,23 +45,6 @@ export class RagService implements OnModuleInit {
       console.log(
         '⚠️  RAG service will continue without ChromaDB. Start ChromaDB with: docker-compose up chroma',
       );
-    }
-  }
-
-  private async initializeCollection() {
-    try {
-      // Try to get existing collection
-      this.collection = await this.chromaClient.getCollection({
-        name: 'healthcare_conversations',
-      });
-    } catch {
-      // Create new collection if it doesn't exist
-      this.collection = await this.chromaClient.createCollection({
-        name: 'healthcare_conversations',
-        metadata: {
-          description: 'Healthcare conversation context and user data',
-        },
-      });
     }
   }
 
@@ -93,38 +68,109 @@ export class RagService implements OnModuleInit {
     }
   }
 
-  // Store conversation context in ChromaDB
   async storeConversationContext(
     patientId: string,
     message: string,
     response: string,
     metadata: Record<string, unknown> = {},
+    fullChatResponse?: {
+      type: string;
+      answer: string;
+      action?: string;
+      parameters?: Record<string, unknown>;
+      actionResult?: Record<string, unknown> | null;
+      rawData?: unknown;
+      timestamp?: string;
+    },
   ) {
     try {
-      if (!this.collection) {
+      if (!this.chromaService.collection) {
         console.log(
           '⚠️  ChromaDB not available, skipping conversation storage',
         );
         return;
       }
 
-      const document = new Document({
-        pageContent: `User: ${message}\nAssistant: ${response}`,
+      const userMessage = {
+        type: 'user',
+        answer: message,
+        action: null,
+        parameters: null,
+        actionResult: null,
+        rawData: null,
+        timestamp: new Date().toISOString(),
+      };
+
+      const assistantMessage = fullChatResponse || {
+        type: 'assistant',
+        answer: response,
+        action: metadata.action || null,
+        parameters: metadata.parameters || null,
+        actionResult: null,
+        rawData: null,
+        timestamp: new Date().toISOString(),
+      };
+      const userDocument = new Document({
+        pageContent: `User: ${userMessage.answer}`,
         metadata: {
           patientId,
-          timestamp: new Date().toISOString(),
+          timestamp: userMessage.timestamp,
+          messageType: 'user',
+          fullMessage: JSON.stringify(userMessage),
           ...this.sanitizeMetadata(metadata),
         },
       });
 
-      const embedding = await this.embeddings.embedQuery(document.pageContent);
+      // const userEmbedding = await this.embeddings.embedQuery(
+      //   userDocument.pageContent,
+      // );
 
-      await this.collection.add({
-        ids: [`${patientId}_${Date.now()}`],
-        embeddings: [embedding],
-        documents: [document.pageContent],
-        metadatas: [document.metadata],
+      try {
+        console.log('ids:', [`${patientId}_user_${Date.now()}`]);
+        // console.log('embedding length:', userEmbedding.length);
+        console.log('documents:', [userDocument.pageContent]);
+        console.log('metadatas:', [userDocument.metadata]);
+
+        await this.chromaService.addDocuments(
+          [`${patientId}_user_${Date.now()}`],
+          [userDocument.pageContent],
+          [userDocument.metadata],
+        );
+      } catch (addError) {
+        console.error('❌ Failed to add user message to ChromaDB:', addError);
+        console.log('⚠️  Continuing without storing user message');
+        return; // Exit early if we can't store the user message
+      }
+
+      const assistantDocument = new Document({
+        pageContent: `Assistant: ${assistantMessage.answer}`,
+        metadata: {
+          patientId,
+          timestamp: assistantMessage.timestamp || new Date().toISOString(),
+          messageType: 'assistant',
+          fullMessage: JSON.stringify(assistantMessage),
+          ...this.sanitizeMetadata(metadata),
+        },
       });
+
+      // const assistantEmbedding = await this.embeddings.embedQuery(
+      //   assistantDocument.pageContent,
+      // );
+
+      try {
+        await this.chromaService.addDocuments(
+          [`${patientId}_assistant_${Date.now() + 1}`],
+          [assistantDocument.pageContent],
+          [assistantDocument.metadata],
+        );
+      } catch (addError) {
+        console.error(
+          '❌ Failed to add assistant message to ChromaDB:',
+          addError,
+        );
+        console.log('⚠️  Continuing without storing assistant message');
+        return; // Exit early if we can't store the assistant message
+      }
 
       console.log('✅ Conversation context stored in ChromaDB');
     } catch (error) {
@@ -132,7 +178,6 @@ export class RagService implements OnModuleInit {
     }
   }
 
-  // Store MCP operation results for future reference
   async storeMcpOperationResult(
     patientId: string,
     operation: string,
@@ -140,7 +185,7 @@ export class RagService implements OnModuleInit {
     metadata: Record<string, unknown> = {},
   ) {
     try {
-      if (!this.collection) {
+      if (!this.chromaService.collection) {
         console.log(
           '⚠️  ChromaDB not available, skipping MCP operation storage',
         );
@@ -155,7 +200,7 @@ export class RagService implements OnModuleInit {
             | Array<{
                 firstName: string;
                 lastName: string;
-                _id: { toString(): string };
+                _id?: { toString(): string } | string;
                 specialization: string;
                 email: string;
               }>
@@ -165,14 +210,20 @@ export class RagService implements OnModuleInit {
             therapists
               ?.map(
                 (t) =>
-                  `- Dr. ${t.firstName} ${t.lastName} (ID: ${t._id.toString()}) - ${t.specialization} - ${t.email}`,
+                  `- Dr. ${t.firstName} ${t.lastName} (ID: ${t._id ? (typeof t._id === 'string' ? t._id : t._id.toString()) : 'N/A'}) - ${t.specialization} - ${t.email}`,
               )
               .join('\n') || 'No therapists found'
           }`;
           operationMetadata.operationType = 'therapist_list';
           operationMetadata.therapistCount = therapists?.length || 0;
           operationMetadata.therapistIds = therapists
-            ?.map((t) => t._id.toString())
+            ?.map((t) =>
+              t._id
+                ? typeof t._id === 'string'
+                  ? t._id
+                  : t._id.toString()
+                : 'N/A',
+            )
             .join(',');
           break;
         }
@@ -180,7 +231,7 @@ export class RagService implements OnModuleInit {
         case 'list_appointments': {
           const appointments = result.data as
             | Array<{
-                _id: { toString(): string };
+                _id?: { toString(): string } | string;
                 appointmentDate: string | Date;
                 status: string;
                 duration: number;
@@ -195,14 +246,20 @@ export class RagService implements OnModuleInit {
             appointments
               ?.map(
                 (apt) =>
-                  `- ID: ${apt._id.toString()}, Date: ${new Date(apt.appointmentDate).toLocaleString()}, Status: ${apt.status}, Duration: ${apt.duration}min, Therapist: ${apt.therapistId?.firstName || 'Unknown'} ${apt.therapistId?.lastName || ''}`,
+                  `- ID: ${apt._id ? (typeof apt._id === 'string' ? apt._id : apt._id.toString()) : 'N/A'}, Date: ${new Date(apt.appointmentDate).toLocaleString()}, Status: ${apt.status}, Duration: ${apt.duration}min, Therapist: ${apt.therapistId?.firstName || 'Unknown'} ${apt.therapistId?.lastName || ''}`,
               )
               .join('\n') || 'No appointments found'
           }`;
           operationMetadata.operationType = 'appointment_list';
           operationMetadata.appointmentCount = appointments?.length || 0;
           operationMetadata.appointmentIds = appointments
-            ?.map((apt) => apt._id.toString())
+            ?.map((apt) =>
+              apt._id
+                ? typeof apt._id === 'string'
+                  ? apt._id
+                  : apt._id.toString()
+                : 'N/A',
+            )
             .join(',');
           break;
         }
@@ -210,7 +267,7 @@ export class RagService implements OnModuleInit {
         case 'book_appointment': {
           const appointment = result.data as
             | {
-                _id?: { toString(): string };
+                _id?: { toString(): string } | string;
                 appointmentDate?: string | Date;
                 duration?: number;
                 therapistId?: {
@@ -220,9 +277,14 @@ export class RagService implements OnModuleInit {
               }
             | undefined;
 
-          documentContent = `Appointment booked successfully:\n- ID: ${appointment?._id?.toString() || 'N/A'}\n- Date: ${appointment?.appointmentDate ? new Date(appointment.appointmentDate).toLocaleString() : 'N/A'}\n- Duration: ${appointment?.duration || 'N/A'}min\n- Therapist: ${appointment?.therapistId?.firstName || 'Unknown'} ${appointment?.therapistId?.lastName || ''}`;
+          const appointmentId = appointment?._id
+            ? typeof appointment._id === 'string'
+              ? appointment._id
+              : appointment._id.toString()
+            : 'N/A';
+          documentContent = `Appointment booked successfully:\n- ID: ${appointmentId}\n- Date: ${appointment?.appointmentDate ? new Date(appointment.appointmentDate).toLocaleString() : 'N/A'}\n- Duration: ${appointment?.duration || 'N/A'}min\n- Therapist: ${appointment?.therapistId?.firstName || 'Unknown'} ${appointment?.therapistId?.lastName || ''}`;
           operationMetadata.operationType = 'appointment_booked';
-          operationMetadata.appointmentId = appointment?._id?.toString();
+          operationMetadata.appointmentId = appointmentId;
           operationMetadata.appointmentDate =
             appointment?.appointmentDate instanceof Date
               ? appointment.appointmentDate.toISOString()
@@ -282,15 +344,14 @@ export class RagService implements OnModuleInit {
         },
       });
 
-      const embedding = await this.embeddings.embedQuery(document.pageContent);
+      // const embedding = await this.embeddings.embedQuery(document.pageContent);
 
       // Store in ChromaDB with a special prefix for MCP results
-      await this.collection.add({
-        ids: [`mcp_${patientId}_${operation}_${Date.now()}`],
-        embeddings: [embedding],
-        documents: [document.pageContent],
-        metadatas: [document.metadata],
-      });
+      await this.chromaService.addDocuments(
+        [`mcp_${patientId}_${operation}_${Date.now()}`],
+        [document.pageContent],
+        [document.metadata],
+      );
 
       console.log(`✅ MCP operation result stored: ${operation}`);
     } catch (error) {
@@ -298,22 +359,22 @@ export class RagService implements OnModuleInit {
     }
   }
 
-  // Retrieve relevant conversation context
   async retrieveConversationContext(
     patientId: string,
     query: string,
     limit: number = 5,
   ): Promise<Document[]> {
     try {
-      if (!this.collection) {
+      if (!this.chromaService.collection) {
         console.log('⚠️  ChromaDB not available, returning empty context');
         return [];
       }
 
-      const queryEmbedding = await this.embeddings.embedQuery(query);
+      // const queryEmbedding = await this.embeddings.embedQuery(query);
 
-      const results = await this.collection.query({
-        queryEmbeddings: [queryEmbedding],
+      const results = await this.chromaService.collection.query({
+        // queryEmbeddings: [queryEmbedding],
+        queryTexts: [query],
         nResults: limit,
         where: { patientId },
       });
@@ -335,13 +396,12 @@ export class RagService implements OnModuleInit {
     }
   }
 
-  // Get patient's current appointments for context
   async getPatientAppointments(patientId: string) {
     try {
       const appointments =
         await this.appointmentsService.findByPatientId(patientId);
       return appointments.map((apt) => ({
-        id: apt._id.toString(),
+        id: apt._id ? apt._id.toString() : 'unknown',
         date: apt.appointmentDate,
         duration: apt.duration,
         status: apt.status,
@@ -359,121 +419,126 @@ export class RagService implements OnModuleInit {
     limit: number = 50,
   ): Promise<
     Array<{
-      id: string;
+      type: string;
+      answer: string;
+      action?: string | null;
+      parameters?: Record<string, unknown> | null;
+      actionResult?: Record<string, unknown> | null;
+      rawData?: unknown;
       timestamp: string;
-      type: 'user' | 'assistant' | 'system';
-      content: string;
-      metadata?: Record<string, unknown>;
     }>
   > {
     try {
-      if (!this.collection) {
+      if (!this.chromaService.collection) {
         console.log('⚠️  ChromaDB not available, returning empty history');
         return [];
       }
 
-      // Get all conversation entries for this patient
-      const results = await this.collection.get({
+      console.log(
+        '🔍 ChromaDB collection available, querying for patient:',
+        patientId,
+      );
+
+      const results = await this.chromaService.collection.get({
         where: { patientId },
-        limit,
+        limit: limit * 2, // Get more than needed to ensure we have enough after sorting
       });
 
       if (!results.documents || results.documents.length === 0) {
         return [];
       }
 
-      // Parse and format conversation history
       const history = results.documents
         .map((doc, index) => {
           const metadata = results.metadatas?.[index] || {};
-          const id = results.ids?.[index] || `msg_${index}`;
           const timestamp =
             (metadata.timestamp as string) || new Date().toISOString();
 
-          // Parse the document content to extract user and assistant messages
-          const lines = doc?.split('\n') || [];
-          const messages: Array<{
-            id: string;
-            timestamp: string;
-            type: 'user' | 'assistant' | 'system';
-            content: string;
-            metadata?: Record<string, any>;
-          }> = [];
+          if (metadata.fullMessage) {
+            try {
+              const fullMessage = JSON.parse(
+                metadata.fullMessage as string,
+              ) as {
+                type: string;
+                answer: string;
+                action?: string | null;
+                parameters?: Record<string, unknown> | null;
+                actionResult?: Record<string, unknown> | null;
+                rawData?: unknown;
+                timestamp?: string;
+              };
 
-          let currentMessage = '';
-          let currentType: 'user' | 'assistant' | 'system' = 'user';
-
-          for (const line of lines) {
-            if (line.startsWith('User: ')) {
-              // Save previous message if exists
-              if (currentMessage.trim()) {
-                messages.push({
-                  id: `${id}_${messages.length}`,
-                  timestamp: timestamp,
-                  type: currentType,
-                  content: currentMessage.trim(),
-                  metadata,
-                });
-              }
-              // Start new user message
-              currentMessage = line.replace('User: ', '');
-              currentType = 'user';
-            } else if (line.startsWith('Assistant: ')) {
-              // Save previous message if exists
-              if (currentMessage.trim()) {
-                messages.push({
-                  id: `${id}_${messages.length}`,
-                  timestamp: timestamp,
-                  type: currentType,
-                  content: currentMessage.trim(),
-                  metadata,
-                });
-              }
-              // Start new assistant message
-              currentMessage = line.replace('Assistant: ', '');
-              currentType = 'assistant';
-            } else if (line.trim()) {
-              // Continue current message
-              currentMessage += (currentMessage ? '\n' : '') + line;
+              return {
+                type: fullMessage.type,
+                answer: fullMessage.answer,
+                action: fullMessage.action,
+                parameters: fullMessage.parameters,
+                actionResult: fullMessage.actionResult,
+                rawData: fullMessage.rawData,
+                timestamp: fullMessage.timestamp || timestamp,
+              };
+            } catch (error) {
+              console.error('Failed to parse full message:', error);
             }
           }
 
-          // Add the last message
-          if (currentMessage.trim()) {
-            messages.push({
-              id: `${id}_${messages.length}`,
-              timestamp: timestamp,
-              type: currentType,
-              content: currentMessage.trim(),
-              metadata,
-            });
-          }
+          const messageType = (metadata.messageType as string) || 'user';
+          const content = doc || '';
 
-          return messages;
+          return {
+            type: messageType,
+            answer: content,
+            action: null,
+            parameters: null,
+            actionResult: null,
+            rawData: null,
+            timestamp: timestamp,
+          };
         })
-        .flat();
+        .filter(
+          (item): item is NonNullable<typeof item> =>
+            item !== null && item !== undefined,
+        );
 
-      history.sort(
+      const sortedHistory = history.sort(
         (a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime(),
       );
 
-      console.log(
-        `📜 Retrieved ${history.length} conversation messages for patient ${patientId}`,
-      );
-      return history;
+      return sortedHistory.slice(-limit);
     } catch (error) {
       console.error('❌ Failed to get conversation history:', error);
       return [];
     }
   }
 
-  // Get available therapists for context
+  async clearConversationHistory(patientId: string) {
+    try {
+      if (!this.chromaService.collection) {
+        console.log('⚠️  ChromaDB not available, cannot clear history');
+        return;
+      }
+
+      const results = await this.chromaService.collection.get({
+        where: { patientId },
+      });
+
+      if (results.ids && results.ids.length > 0) {
+        await this.chromaService.deleteDocuments(results.ids);
+        console.log(
+          `✅ Cleared ${results.ids.length} conversation messages for patient ${patientId}`,
+        );
+      }
+    } catch (error) {
+      console.error('❌ Failed to clear conversation history:', error);
+    }
+  }
+
   async getAvailableTherapists() {
     try {
       const therapists = await this.therapistsService.findAll();
       return therapists.map((t) => ({
-        id: t._id.toString(),
+        id: t._id ? t._id.toString() : 'unknown',
         name: `Dr. ${t.firstName} ${t.lastName}`,
         specialization: t.specialization,
         email: t.email,
@@ -484,10 +549,18 @@ export class RagService implements OnModuleInit {
     }
   }
 
-  // Process user message with RAG
   async processMessageWithRag(
     message: string,
     jwtToken: string,
+    conversationHistory?: Array<{
+      type: string;
+      answer: string;
+      action?: string | null;
+      parameters?: Record<string, unknown> | null;
+      actionResult?: Record<string, unknown> | null;
+      rawData?: unknown;
+      timestamp: string;
+    }>,
   ): Promise<{
     response: string;
     action?: string;
@@ -506,7 +579,6 @@ export class RagService implements OnModuleInit {
       const therapists = await this.getAvailableTherapists();
       const patient = await this.patientsService.findById(patientId);
 
-      // Build context string
       const contextString = this.buildContextString(
         contextDocs,
         appointments,
@@ -514,28 +586,43 @@ export class RagService implements OnModuleInit {
         patient,
       );
 
-      // Create system prompt with context
       const systemPrompt = this.createSystemPrompt(contextString);
 
-      // Generate response using LLM
-      const response = await this.llm.invoke([
+      const messages: Array<{ role: string; content: string }> = [
         { role: 'system', content: systemPrompt },
-        { role: 'user', content: message },
-      ]);
+      ];
 
-      // Parse response for actions
+      if (conversationHistory && conversationHistory.length > 0) {
+        console.log(
+          '📚 Conversation history for context:',
+          JSON.stringify(conversationHistory.slice(-5), null, 2),
+        );
+        const recentHistory = conversationHistory.slice(-5);
+        for (const msg of recentHistory) {
+          if (msg.type === 'user') {
+            messages.push({ role: 'user', content: msg.answer });
+          } else if (msg.type === 'assistant') {
+            let assistantContent = msg.answer;
+            if (msg.action) {
+              assistantContent += `\n[Previous action: ${msg.action}]`;
+              if (msg.parameters) {
+                assistantContent += `\n[Previous parameters: ${JSON.stringify(msg.parameters)}]`;
+              }
+            }
+            messages.push({ role: 'assistant', content: assistantContent });
+          }
+        }
+      } else {
+        console.log('📚 No conversation history available for context');
+      }
+
+      messages.push({ role: 'user', content: message });
+
+      const response = await this.llm.invoke(messages);
+
+      console.log('🤖 Raw LLM response:', response.content);
+
       const parsedResponse = this.parseResponse(response.content as string);
-
-      // Store conversation context
-      await this.storeConversationContext(
-        patientId,
-        message,
-        parsedResponse.response,
-        {
-          action: parsedResponse.action,
-          parameters: parsedResponse.parameters,
-        },
-      );
 
       return parsedResponse;
     } catch (error) {
@@ -574,7 +661,6 @@ export class RagService implements OnModuleInit {
   ): string {
     let context = `Patient: ${patient.firstName} ${patient.lastName} (${patient.email})\n\n`;
 
-    // Add conversation history
     if (contextDocs.length > 0) {
       context += 'Recent conversation:\n';
       contextDocs.forEach((doc) => {
@@ -582,7 +668,6 @@ export class RagService implements OnModuleInit {
       });
     }
 
-    // Add current appointments
     if (appointments.length > 0) {
       context += 'Current appointments:\n';
       appointments.forEach((apt) => {
@@ -591,7 +676,6 @@ export class RagService implements OnModuleInit {
       context += '\n';
     }
 
-    // Add available therapists
     context += 'Available therapists:\n';
     therapists.forEach((t) => {
       context += `- ID: ${t.id}, Name: ${t.name}, Specialization: ${t.specialization}\n`;
@@ -601,6 +685,7 @@ export class RagService implements OnModuleInit {
   }
 
   private createSystemPrompt(context: string): string {
+    const currentYear = new Date().getFullYear();
     return `You are a helpful healthcare assistant. You have access to the following context:
 
 ${context}
@@ -620,20 +705,138 @@ IMPORTANT INSTRUCTIONS:
 
 When the user wants to:
 - List therapists: ALWAYS call list_therapists tool (returns JSON data)
-- Book an appointment: Use therapist ID from cached context if available, otherwise call list_therapists first
+- Book an appointment: ONLY call book_appointment if you have ALL required information (therapistId, appointmentDate, duration). If missing any info, ask the user for it.
 - View appointments: ALWAYS call list_appointments tool (returns JSON data)
 - Cancel an appointment: Use appointment ID from cached context if available, otherwise call list_appointments first
 - View profile: ALWAYS call get_profile tool (returns JSON data)
 
-ALWAYS respond with action format when you need to fetch data:
+CRITICAL: When the user asks for specific data (therapists, appointments, profile), you MUST respond with the exact format:
+
 ACTION: [action_name]
-PARAMETERS: {"key": "value", "key2": "value2"}
+PARAMETERS: {"key": "value"}
 
-IMPORTANT: Parameters must be valid JSON on a single line. Example:
+Examples:
+- For "list therapists" or "show me therapists":
+ACTION: list_therapists
+PARAMETERS: {}
+
+- For "book appointment" (ONLY if you have all required info):
 ACTION: book_appointment
-PARAMETERS: {"therapistId": "507f1f77bcf86cd799439011", "appointmentDate": "2024-01-15T10:00:00", "duration": 60}
+PARAMETERS: {"therapistId": "actual_therapist_id", "appointmentDate": "${currentYear}-01-15T10:00:00", "duration": 60}
 
-The MCP tools return structured JSON data that should be passed through to the user.`;
+- For "my appointments":
+ACTION: list_appointments
+PARAMETERS: {}
+
+- For "my profile":
+ACTION: get_profile
+PARAMETERS: {}
+
+CONTEXT EXAMPLE:
+If the conversation flow is:
+1. User: "Book appointment with Dr. David Davis"
+2. Assistant: "Please provide date, time, and duration"
+3. User: "book on 15th September at 5:00 PM for 30 minutes"
+
+Then the assistant should immediately book the appointment with:
+ACTION: book_appointment
+PARAMETERS: {"therapistId": "david_davis_id", "appointmentDate": "${currentYear}-09-15T17:00:00", "duration": 30}
+
+ANOTHER EXAMPLE:
+If the conversation flow is:
+1. User: "Book appointment"
+2. Assistant: "Which therapist would you like to book with? Here are available therapists: Dr. David Davis, Dr. Emily Brown..."
+3. User: "Dr. David Davis"
+4. Assistant: "What date and time would you prefer? How long should the appointment be?"
+5. User: "tomorrow at 2 PM for 60 minutes"
+
+Then the assistant should immediately book the appointment with:
+ACTION: book_appointment
+PARAMETERS: {"therapistId": "david_davis_id", "appointmentDate": "${currentYear}-09-16T14:00:00", "duration": 60}
+
+CONTEXT DATA EXAMPLE:
+If conversation history contains:
+- actionResult.data: [{"id": "68bbe9a467aead836a2c21e9", "firstName": "David", "lastName": "Davis", ...}]
+- User says: "book with Dr. David Davis"
+
+Then use the ID from context:
+ACTION: book_appointment
+PARAMETERS: {"therapistId": "68bbe9a467aead836a2c21e9", "appointmentDate": "...", "duration": ...}
+
+CONTEXT USAGE EXAMPLE:
+If conversation history shows therapist data was retrieved and user says "book appointment":
+- DO NOT respond with: "Which therapist would you like to book with? Here are the available therapists: Dr. John Smith, Dr. Sarah Johnson..."
+- DO respond with: "Which therapist would you like to book with? I can see the available therapists from our previous conversation."
+
+CRITICAL: When a user provides information in response to your questions, you MUST:
+1. Connect their response with the previous context
+2. Use the information they provided
+3. Proceed with the action if you have all required information
+4. DO NOT ask for the same information again
+
+CONTEXT CONNECTION RULES:
+- If you asked "Which therapist would you like to book with?" and user responds with a therapist name, use that therapist
+- If you asked "What date and time would you prefer?" and user responds with date/time, use that date/time
+- If you asked "How long should the appointment be?" and user responds with duration, use that duration
+- ALWAYS combine information from multiple messages in the conversation
+- NEVER ask for information that has already been provided in the conversation
+
+IMPORTANT: For appointment booking, you MUST have:
+- therapistId: The exact ID of the therapist
+- appointmentDate: Date and time in ISO format (e.g., "${currentYear}-01-15T10:00:00")
+- duration: Duration in minutes (15-180)
+
+CRITICAL DATE HANDLING:
+- ALWAYS use the current year (${currentYear}) when parsing dates
+- If user says "tomorrow", "next week", "next month", calculate from current date
+- If user provides a date without year, assume current year (${currentYear})
+- Convert relative dates (tomorrow, next week) to absolute dates with current year
+
+CONTEXT AWARENESS: 
+- ALWAYS review the conversation history to understand what information has already been provided
+- If the user has already provided some information in previous messages, use that information
+- If the user mentions a therapist name, look for their ID in the context
+- If the user provides a date/time, convert it to ISO format (e.g., "15th September at 5:00 PM" → "${currentYear}-09-15T17:00:00")
+- Only ask for information that is still missing
+- If you have all required information, proceed with booking
+- When a user responds to your questions, connect their response with the previous context
+- For appointment booking, if you asked for details and the user provided them, use those details immediately
+- NEVER ask for the same information twice in the same conversation
+
+CONTEXT DATA USAGE:
+- If conversation history contains therapist data in actionResult/rawData, use those therapist IDs directly
+- If user says "book with Dr. David Davis", find his ID from the context data
+- If user says "book appointment" after therapist list was shown, ask which specific therapist from the list
+- Use the exact therapist IDs from the context data, not generic names
+
+CRITICAL CONTEXT RULES:
+- If conversation history shows therapist data was already retrieved (actionResult.data contains therapist list), DO NOT ask for therapist list again
+- If user says "book appointment" and therapist data exists in context, ask which specific therapist from the existing list
+- If user mentions a therapist name, immediately look up their ID from the context data
+- NEVER repeat information that's already in the conversation history
+
+If the user says "book appointment" without providing these details, ask them:
+1. Which therapist would you like to book with? (provide therapist list if needed)
+2. What date and time would you prefer?
+3. How long should the appointment be? (15-180 minutes)
+
+SPECIAL CASE: If conversation history contains therapist data (actionResult.data with therapist list):
+- DO NOT ask for therapist list again
+- Instead ask: "Which therapist would you like to book with? I can see the available therapists from our previous conversation."
+- Then ask for date/time and duration
+
+BOOKING FLOW WITH CONTEXT:
+1. If user says "book appointment" and therapist data exists in context:
+   - Ask: "Which therapist would you like to book with? I can see the available therapists from our previous conversation."
+   - DO NOT repeat the therapist list
+2. If user mentions a specific therapist name:
+   - Look up their ID from the context data
+   - Ask for date/time and duration
+3. If user provides all details:
+   - Use the therapist ID from context
+   - Proceed with booking
+
+DO NOT provide natural language responses for data requests. ALWAYS use the ACTION/PARAMETERS format.`;
   }
 
   private parseResponse(response: string): {
@@ -653,18 +856,115 @@ The MCP tools return structured JSON data that should be passed through to the u
       .replace(/PARAMETERS:\s*.+/gi, '')
       .trim();
 
+    if (actionMatch && !parametersMatch) {
+      const action = actionMatch[1].trim().toLowerCase();
+      let parameters = {};
+
+      if (
+        action === 'list_therapists' ||
+        action === 'list_appointments' ||
+        action === 'get_profile'
+      ) {
+        parameters = {};
+      }
+
+      console.log(
+        '✅ Parsed action without explicit parameters:',
+        action,
+        'with inferred parameters:',
+        parameters,
+      );
+      return {
+        response: cleanResponse,
+        action: actionMatch[1].trim(),
+        parameters,
+      };
+    }
+
+    const lowerResponse = response.toLowerCase();
+    const isAskingForInfo =
+      lowerResponse.includes('which therapist') ||
+      lowerResponse.includes('what date') ||
+      lowerResponse.includes('what time') ||
+      lowerResponse.includes('how long') ||
+      lowerResponse.includes('please provide') ||
+      lowerResponse.includes('i need') ||
+      lowerResponse.includes('missing') ||
+      lowerResponse.includes('required') ||
+      lowerResponse.includes('need more details') ||
+      lowerResponse.includes('few more details') ||
+      lowerResponse.includes('provide the following details');
+
+    const isRepeatingTherapistList =
+      lowerResponse.includes('here are the available therapists') ||
+      lowerResponse.includes('available therapists:') ||
+      (lowerResponse.includes('dr.') &&
+        lowerResponse.includes('specialization'));
+
+    if (isAskingForInfo && !isRepeatingTherapistList) {
+      console.log(
+        '✅ LLM is asking for more information, returning response without action',
+      );
+      return {
+        response: cleanResponse,
+        action: undefined,
+        parameters: undefined,
+      };
+    }
+
+    if (isRepeatingTherapistList) {
+      console.log(
+        '⚠️  LLM is repeating therapist list instead of using context, returning response without action',
+      );
+      return {
+        response: cleanResponse,
+        action: undefined,
+        parameters: undefined,
+      };
+    }
+
+    if (
+      lowerResponse.includes('list') &&
+      (lowerResponse.includes('therapist') || lowerResponse.includes('doctor'))
+    ) {
+      console.log('✅ Detected therapist list request, mapping to action');
+      return {
+        response: cleanResponse,
+        action: 'list_therapists',
+        parameters: {},
+      };
+    }
+    if (
+      lowerResponse.includes('appointment') &&
+      (lowerResponse.includes('list') ||
+        lowerResponse.includes('show') ||
+        lowerResponse.includes('my'))
+    ) {
+      console.log('✅ Detected appointment list request, mapping to action');
+      return {
+        response: cleanResponse,
+        action: 'list_appointments',
+        parameters: {},
+      };
+    }
+    if (
+      lowerResponse.includes('profile') &&
+      (lowerResponse.includes('my') || lowerResponse.includes('show'))
+    ) {
+      console.log('✅ Detected profile request, mapping to action');
+      return { response: cleanResponse, action: 'get_profile', parameters: {} };
+    }
+
     if (actionMatch && parametersMatch) {
       try {
         const action = actionMatch[1].trim();
         let parametersString = parametersMatch[1].trim();
 
-        // Clean up the parameters string - remove newlines and fix formatting
         parametersString = parametersString
           .replace(/\n/g, ' ')
           .replace(/\s+/g, ' ')
           .trim();
 
-        // If it's not wrapped in braces, wrap it
         if (!parametersString.startsWith('{')) {
           parametersString = `{${parametersString}}`;
         }
@@ -685,12 +985,10 @@ The MCP tools return structured JSON data that should be passed through to the u
         console.error('❌ Failed to parse action parameters:', error);
         console.log('Raw parameters string:', parametersMatch[1]);
 
-        // Try to extract parameters manually as fallback
         try {
           const action = actionMatch[1].trim();
           const rawParams = parametersMatch[1].trim();
 
-          // Extract key-value pairs manually
           const paramPairs = rawParams.match(/"([^"]+)":\s*"([^"]+)"/g);
           if (paramPairs) {
             const parameters: Record<string, unknown> = {};
@@ -716,15 +1014,18 @@ The MCP tools return structured JSON data that should be passed through to the u
     return { response: cleanResponse || response };
   }
 
-  // Sanitize metadata for ChromaDB compatibility
   private sanitizeMetadata(
     metadata: Record<string, unknown>,
-  ): Record<string, string | number | boolean | null> {
-    const sanitized: Record<string, string | number | boolean | null> = {};
+  ): Record<string, string | number | boolean> {
+    const sanitized: Record<string, string | number | boolean> = {};
 
     for (const [key, value] of Object.entries(metadata)) {
+      /**
+       * skip null/undefined because chromadb doesn't process it
+       * even after they mentioned `null` as a possible type
+       */
       if (value === null || value === undefined) {
-        sanitized[key] = null;
+        continue;
       } else if (
         typeof value === 'string' ||
         typeof value === 'number' ||
@@ -736,7 +1037,6 @@ The MCP tools return structured JSON data that should be passed through to the u
       } else if (typeof value === 'object') {
         sanitized[key] = JSON.stringify(value);
       } else {
-        // Convert everything else to string (functions, symbols, etc.)
         if (typeof value === 'function') {
           sanitized[key] = '[Function]';
         } else if (typeof value === 'symbol') {
@@ -744,7 +1044,6 @@ The MCP tools return structured JSON data that should be passed through to the u
         } else if (typeof value === 'bigint') {
           sanitized[key] = value.toString();
         } else {
-          // For any other type, use a safe string conversion
           sanitized[key] = '[Unknown Type]';
         }
       }

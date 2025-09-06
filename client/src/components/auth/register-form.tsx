@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useAuth } from '@/hooks/use-auth';
 import { toast } from 'sonner';
 import { Eye, EyeOff, Loader2 } from 'lucide-react';
@@ -18,6 +19,7 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
+  const [gender, setGender] = useState<'male' | 'female' | ''>('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   
@@ -37,8 +39,13 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
       return;
     }
 
+    if (!gender) {
+      toast.error('Please select your gender');
+      return;
+    }
+
     try {
-      await register(name, email, password);
+      await register(name, email, password, gender);
       toast.success('Registration successful!');
       router.push('/dashboard');
     } catch (error) {
@@ -85,6 +92,21 @@ export function RegisterForm({ onSwitchToLogin }: RegisterFormProps) {
               required
               disabled={isLoading}
             />
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="gender" className="text-sm font-medium">
+              Gender
+            </label>
+            <Select value={gender} onValueChange={(value: 'male' | 'female') => setGender(value)} disabled={isLoading}>
+              <SelectTrigger className='w-full'>
+                <SelectValue placeholder="Select your gender" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="male">Male</SelectItem>
+                <SelectItem value="female">Female</SelectItem>
+              </SelectContent>
+            </Select>
           </div>
           
           <div className="space-y-2">

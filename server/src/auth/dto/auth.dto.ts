@@ -1,4 +1,10 @@
-import { IsEmail, IsString, MinLength, IsOptional } from 'class-validator';
+import {
+  IsEmail,
+  IsString,
+  MinLength,
+  IsOptional,
+  IsIn,
+} from 'class-validator';
 
 export class LoginDto {
   @IsEmail()
@@ -34,4 +40,8 @@ export class RegisterPatientDto {
   @IsOptional()
   @IsString()
   address?: string;
+
+  @IsString()
+  @IsIn(['male', 'female'])
+  gender: 'male' | 'female';
 }

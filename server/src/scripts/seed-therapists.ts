@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { RandomUserService } from '../common/random-user.service';
 
 interface Therapist {
   firstName: string;
@@ -8,6 +9,7 @@ interface Therapist {
   rating?: number;
   email: string;
   phone: string;
+  photo: string;
   isActive: boolean;
 }
 
@@ -19,12 +21,15 @@ const therapistSchema = new mongoose.Schema<Therapist>({
   rating: { type: Number, min: 1, max: 5 },
   email: { type: String, required: true, unique: true },
   phone: { type: String, required: true },
+  photo: { type: String },
   isActive: { type: Boolean, default: true },
 });
 
 const TherapistModel = mongoose.model<Therapist>('Therapist', therapistSchema);
 
-const therapistsData: Therapist[] = [
+const therapistsData: (Omit<Therapist, 'photo'> & {
+  gender: 'male' | 'female';
+})[] = [
   {
     firstName: 'John',
     lastName: 'Smith',
@@ -34,6 +39,7 @@ const therapistsData: Therapist[] = [
     email: 'dr.smith@healthcare.com',
     phone: '+1-555-0101',
     isActive: true,
+    gender: 'male',
   },
   {
     firstName: 'Sarah',
@@ -44,6 +50,7 @@ const therapistsData: Therapist[] = [
     email: 'dr.johnson@healthcare.com',
     phone: '+1-555-0102',
     isActive: true,
+    gender: 'female',
   },
   {
     firstName: 'Michael',
@@ -54,6 +61,7 @@ const therapistsData: Therapist[] = [
     email: 'dr.williams@healthcare.com',
     phone: '+1-555-0103',
     isActive: true,
+    gender: 'male',
   },
   {
     firstName: 'Emily',
@@ -64,6 +72,7 @@ const therapistsData: Therapist[] = [
     email: 'dr.brown@healthcare.com',
     phone: '+1-555-0104',
     isActive: true,
+    gender: 'female',
   },
   {
     firstName: 'David',
@@ -74,6 +83,7 @@ const therapistsData: Therapist[] = [
     email: 'dr.davis@healthcare.com',
     phone: '+1-555-0105',
     isActive: true,
+    gender: 'male',
   },
   {
     firstName: 'Lisa',
@@ -84,6 +94,7 @@ const therapistsData: Therapist[] = [
     email: 'dr.wilson@healthcare.com',
     phone: '+1-555-0106',
     isActive: true,
+    gender: 'female',
   },
   {
     firstName: 'Robert',
@@ -94,6 +105,7 @@ const therapistsData: Therapist[] = [
     email: 'dr.garcia@healthcare.com',
     phone: '+1-555-0107',
     isActive: true,
+    gender: 'male',
   },
   {
     firstName: 'Jennifer',
@@ -104,6 +116,7 @@ const therapistsData: Therapist[] = [
     email: 'dr.martinez@healthcare.com',
     phone: '+1-555-0108',
     isActive: true,
+    gender: 'female',
   },
 ];
 
@@ -120,8 +133,24 @@ async function seedTherapists() {
     await TherapistModel.deleteMany({});
     console.log('Existing therapists cleared.');
 
+    console.log('Fetching therapist photos from Random User API...');
+    const randomUserService = new RandomUserService();
+
+    const therapistsWithPhotos = await Promise.all(
+      therapistsData.map(async (therapist) => {
+        const photo = await randomUserService.getRandomUserPhoto(
+          therapist.gender,
+          'medium',
+        );
+        return {
+          ...therapist,
+          photo,
+        };
+      }),
+    );
+
     console.log('Seeding therapists...');
-    const result = await TherapistModel.insertMany(therapistsData);
+    const result = await TherapistModel.insertMany(therapistsWithPhotos);
     console.log(`Successfully seeded ${result.length} therapists!`);
 
     console.log('\nSeeded Therapists:');
@@ -135,6 +164,7 @@ async function seedTherapists() {
       );
       console.log(`   Email: ${therapist.email}`);
       console.log(`   Phone: ${therapist.phone}`);
+      console.log(`   Photo: ${therapist.photo}`);
       console.log('');
     });
   } catch (error) {
@@ -147,4 +177,4 @@ async function seedTherapists() {
   }
 }
 
-seedTherapists();
+void seedTherapists();

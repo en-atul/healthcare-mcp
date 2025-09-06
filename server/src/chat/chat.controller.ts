@@ -22,10 +22,8 @@ export class ChatController {
     private readonly ragService: RagService,
   ) {}
 
-  // Helper method to extract patient ID from JWT token
   private extractPatientIdFromToken(token: string): string {
     try {
-      // Simple JWT decode - in production, use proper JWT service
       const payload = JSON.parse(
         Buffer.from(token.split('.')[1], 'base64').toString(),
       ) as { sub: string };
@@ -52,28 +50,15 @@ export class ChatController {
       const patientId = this.extractPatientIdFromToken(jwtToken);
       const messageLimit = limit ? parseInt(limit, 10) : 50;
 
-      // Get conversation history from RAG service
       const history = await this.ragService.getConversationHistory(
         patientId,
         messageLimit,
       );
 
-      return {
-        success: true,
-        data: history,
-        message: 'Conversation history retrieved successfully',
-        total: history.length,
-        limit: messageLimit,
-      };
+      return history;
     } catch (error) {
       console.error('❌ Error retrieving conversation history:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        data: [],
-        total: 0,
-        limit: 0,
-      };
+      return [];
     }
   }
 
@@ -82,7 +67,6 @@ export class ChatController {
     try {
       console.log('📨 User message:', message);
 
-      // Extract JWT token from request headers
       const authorization = (req.headers as { authorization?: string })
         ?.authorization;
       const jwtToken = authorization?.replace('Bearer ', '');
@@ -91,18 +75,36 @@ export class ChatController {
         throw new Error('JWT token not found in request');
       }
 
-      // Step 1: Process message with RAG
+      let patientId: string;
+      try {
+        patientId = this.extractPatientIdFromToken(jwtToken);
+      } catch {
+        throw new Error('Invalid JWT token');
+      }
+      console.log('🔍 Getting conversation history for patient:', patientId);
+      const conversationHistory = await this.ragService.getConversationHistory(
+        patientId,
+        10,
+      );
+      console.log(
+        '📚 Retrieved conversation history:',
+        conversationHistory.length,
+        'messages',
+      );
+
       console.log('🧠 RAG processing message...');
       const ragResponse = await this.ragService.processMessageWithRag(
         message,
         jwtToken,
+        conversationHistory,
       );
       console.log('📊 RAG response:', JSON.stringify(ragResponse, null, 2));
+      console.log('🔍 RAG action:', ragResponse.action);
+      console.log('🔍 RAG parameters:', ragResponse.parameters);
 
       let finalResponse = ragResponse.response;
       let actionResult: any = null;
 
-      // Step 2: Execute action if needed
       if (ragResponse.action && ragResponse.parameters) {
         console.log('🔧 Executing action:', ragResponse.action);
         const argsWithToken = { ...ragResponse.parameters, jwtToken };
@@ -112,44 +114,51 @@ export class ChatController {
         );
         console.log('📊 Action result:', actionResult);
 
-        // Store MCP operation result in RAG for future reference
         if (actionResult) {
-          await this.ragService.storeMcpOperationResult(
-            this.extractPatientIdFromToken(jwtToken),
-            ragResponse.action,
-            actionResult,
-            ragResponse.parameters,
-          );
-        }
-
-        // Update response with action result
-        if (actionResult) {
-          // If actionResult has formattedResponse, use it
           if (
             actionResult &&
             typeof actionResult === 'object' &&
-            'formattedResponse' in actionResult
+            'message' in actionResult
           ) {
-            finalResponse = (actionResult as { formattedResponse: string })
-              .formattedResponse;
-          }
-          // If actionResult has raw data, include it in the response
-          if (
-            actionResult &&
-            typeof actionResult === 'object' &&
-            'data' in actionResult
-          ) {
-            // Keep the formatted response but also include raw data
-            const resultWithData = actionResult as {
-              formattedResponse?: string;
-              data: unknown;
-            };
-            finalResponse = resultWithData.formattedResponse || finalResponse;
+            finalResponse = (actionResult as { message: string }).message;
           }
         }
       }
+      const fullChatResponse = {
+        type: 'assistant',
+        answer: finalResponse,
+        action: ragResponse.action,
+        parameters: ragResponse.parameters,
+        actionResult: actionResult as Record<string, unknown> | null,
+        rawData:
+          actionResult &&
+          typeof actionResult === 'object' &&
+          'data' in actionResult
+            ? (actionResult as { data: unknown }).data
+            : null,
+        timestamp: new Date().toISOString(),
+      };
+
+      console.log('💾 Storing conversation context for patient:', patientId);
+      try {
+        await this.ragService.storeConversationContext(
+          patientId,
+          message,
+          finalResponse,
+          {
+            action: ragResponse.action,
+            parameters: ragResponse.parameters,
+          },
+          fullChatResponse,
+        );
+        console.log('✅ Conversation context stored successfully');
+      } catch (storageError) {
+        console.error('❌ Failed to store conversation context:', storageError);
+        console.log('⚠️  Continuing without storing conversation context');
+      }
 
       return {
+        type: 'assistant',
         answer: finalResponse,
         action: ragResponse.action,
         parameters: ragResponse.parameters,
@@ -165,8 +174,37 @@ export class ChatController {
     } catch (error) {
       console.error('❌ Error in RAG chat pipeline:', error);
       return {
+        type: 'assistant',
         answer:
           'I apologize, but I encountered an error processing your request. Please try again.',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  @Post('clear-history')
+  async clearConversationHistory(@Req() req: Request) {
+    try {
+      const authorization = (req.headers as { authorization?: string })
+        ?.authorization;
+      const jwtToken = authorization?.replace('Bearer ', '');
+
+      if (!jwtToken) {
+        throw new Error('JWT token not found in request');
+      }
+
+      const patientId = this.extractPatientIdFromToken(jwtToken);
+      await this.ragService.clearConversationHistory(patientId);
+
+      return {
+        success: true,
+        message: 'Conversation history cleared successfully',
+      };
+    } catch (error) {
+      console.error('❌ Error clearing conversation history:', error);
+      return {
+        success: false,
+        message: 'Failed to clear conversation history',
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }

@@ -28,6 +28,12 @@ export class Patient {
   @Prop()
   address: string;
 
+  @Prop()
+  gender: 'male' | 'female';
+
+  @Prop()
+  photo: string;
+
   @Prop({ default: 'patient' })
   role: string;
 

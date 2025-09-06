@@ -10,38 +10,42 @@ import * as bcrypt from 'bcryptjs';
 import { Patient, PatientDocument } from '../patients/schemas/patient.schema';
 import { LoginDto, RegisterPatientDto } from './dto/auth.dto';
 import { JwtPayload } from '../common/auth.utils';
+import { RandomUserService } from '../common/random-user.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<PatientDocument>,
     private jwtService: JwtService,
+    private randomUserService: RandomUserService,
   ) {}
 
   async registerPatient(registerDto: RegisterPatientDto) {
-    const { email, password, ...rest } = registerDto;
+    const { email, password, gender, ...rest } = registerDto;
 
-    // Check if patient already exists
     const existingPatient = await this.patientModel.findOne({ email });
     if (existingPatient) {
       throw new ConflictException('Patient with this email already exists');
     }
 
-    // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    // Create patient
+    const photo = await this.randomUserService.getRandomUserPhoto(
+      gender,
+      'medium',
+    );
+
     const patient = new this.patientModel({
       email,
       password: hashedPassword,
+      gender,
+      photo,
       ...rest,
     });
 
     const savedPatient = await patient.save();
-
-    // Generate JWT token
     const payload: JwtPayload = {
-      sub: savedPatient._id.toString(),
+      sub: savedPatient._id ? savedPatient._id.toString() : '',
       email: savedPatient.email,
       role: savedPatient.role,
     };
@@ -54,6 +58,7 @@ export class AuthService {
         firstName: savedPatient.firstName,
         lastName: savedPatient.lastName,
         role: savedPatient.role,
+        photo: savedPatient.photo,
       },
     };
   }
@@ -61,21 +66,17 @@ export class AuthService {
   async loginPatient(loginDto: LoginDto) {
     const { email, password } = loginDto;
 
-    // Find patient
     const patient = await this.patientModel.findOne({ email });
     if (!patient) {
       throw new UnauthorizedException('Invalid credentials');
     }
 
-    // Verify password
     const isPasswordValid = await bcrypt.compare(password, patient.password);
     if (!isPasswordValid) {
       throw new UnauthorizedException('Invalid credentials');
     }
-
-    // Generate JWT token
     const payload: JwtPayload = {
-      sub: patient._id.toString(),
+      sub: patient._id ? patient._id.toString() : '',
       email: patient.email,
       role: patient.role,
     };
@@ -88,6 +89,7 @@ export class AuthService {
         firstName: patient.firstName,
         lastName: patient.lastName,
         role: patient.role,
+        photo: patient.photo,
       },
     };
   }

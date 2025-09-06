@@ -43,4 +43,4 @@ async function bootstrap() {
   console.log(`🌍 Environment: ${appEnvironment}`);
   console.log(`🔧 Debug mode: ${appDebug ? 'enabled' : 'disabled'}`);
 }
-bootstrap();
+void bootstrap();
