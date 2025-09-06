@@ -4,9 +4,10 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { useAppStore } from '@/stores/app-store';
 import { toast } from 'sonner';
-import { Calendar, Clock, User, X, Plus } from 'lucide-react';
+import { Calendar, Clock, X, Plus } from 'lucide-react';
 import { format, parseISO, isToday, isTomorrow, isPast } from 'date-fns';
 
 export function AppointmentsPanel() {
@@ -118,22 +119,41 @@ export function AppointmentsPanel() {
                 key={appointment._id}
                 className="flex items-center justify-between p-3 rounded-lg border bg-card"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 mb-1">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="font-medium text-sm truncate">
-                      Dr. {appointment.therapistName || 'Therapist'}
-                    </span>
-                    <Badge
-                      variant="secondary"
-                      className={`text-xs ${getStatusColor(appointment.status)} text-white`}
-                    >
-                      {appointment.status}
-                    </Badge>
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="relative">
+                    {/* Therapist Photo (back) */}
+                    <Avatar className="h-10 w-10">
+                      <AvatarImage src={appointment.therapistPhoto} alt={`Dr. ${appointment.therapistName}`} />
+                      <AvatarFallback className="bg-primary text-primary-foreground">
+                        {appointment.therapistName ? appointment.therapistName.split(' ').map(n => n[0]).join('') : 'DR'}
+                      </AvatarFallback>
+                    </Avatar>
+                    {/* Patient Photo (front, slightly offset) */}
+                    {appointment.patientPhoto && (
+                      <Avatar className="h-8 w-8 absolute -bottom-1 -right-1 border-2 border-white">
+                        <AvatarImage src={appointment.patientPhoto} alt={`${appointment.patientName || 'Patient'}`} />
+                        <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
+                          {appointment.patientName ? appointment.patientName.split(' ').map(n => n[0]).join('') : 'P'}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
                   </div>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <Clock className="h-3 w-3" />
-                    <span>{formatAppointmentDate(appointment.appointmentDate)}</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="font-medium text-sm truncate">
+                        Dr. {appointment.therapistName || 'Therapist'}
+                      </span>
+                      <Badge
+                        variant="secondary"
+                        className={`text-xs ${getStatusColor(appointment.status)} text-white`}
+                      >
+                        {appointment.status}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Clock className="h-3 w-3" />
+                      <span>{formatAppointmentDate(appointment.appointmentDate)}</span>
+                    </div>
                   </div>
                 </div>
                 <Button
@@ -162,20 +182,40 @@ export function AppointmentsPanel() {
                 key={appointment._id}
                 className="flex items-center justify-between p-3 rounded-lg border bg-muted/40"
               >
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="font-medium text-sm truncate">
-                      Dr. {appointment.therapistName || 'Therapist'}
-                    </span>
-                    <Badge
-                      variant="secondary"
-                      className={`text-xs ${getStatusColor(appointment.status)}`}
-                    >
-                      {appointment.status}
-                    </Badge>
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="relative">
+                    {/* Therapist Photo (back) */}
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={appointment.therapistPhoto} alt={`Dr. ${appointment.therapistName}`} />
+                      <AvatarFallback className="bg-primary text-primary-foreground text-xs">
+                        {appointment.therapistName ? appointment.therapistName.split(' ').map(n => n[0]).join('') : 'DR'}
+                      </AvatarFallback>
+                    </Avatar>
+                    {/* Patient Photo (front, slightly offset) */}
+                    {appointment.patientPhoto && (
+                      <Avatar className="h-6 w-6 absolute -bottom-0.5 -right-0.5 border border-white">
+                        <AvatarImage src={appointment.patientPhoto} alt={`${appointment.patientName || 'Patient'}`} />
+                        <AvatarFallback className="bg-secondary text-secondary-foreground text-xs">
+                          {appointment.patientName ? appointment.patientName.split(' ').map(n => n[0]).join('') : 'P'}
+                        </AvatarFallback>
+                      </Avatar>
+                    )}
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatAppointmentDate(appointment.appointmentDate)}
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="font-medium text-sm truncate">
+                        Dr. {appointment.therapistName || 'Therapist'}
+                      </span>
+                      <Badge
+                        variant="secondary"
+                        className={`text-xs ${getStatusColor(appointment.status)}`}
+                      >
+                        {appointment.status}
+                      </Badge>
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {formatAppointmentDate(appointment.appointmentDate)}
+                    </div>
                   </div>
                 </div>
               </div>

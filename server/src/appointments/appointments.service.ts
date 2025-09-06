@@ -28,29 +28,29 @@ export class AppointmentsService {
   async findAll() {
     return this.appointmentModel
       .find()
-      .populate('patientId', 'firstName lastName email')
-      .populate('therapistId', 'firstName lastName specialization');
+      .populate('patientId', 'firstName lastName email photo')
+      .populate('therapistId', 'firstName lastName specialization photo');
   }
 
   async findByPatientId(patientId: string) {
     return this.appointmentModel
       .find({ patientId: new Types.ObjectId(patientId) })
-      .populate('patientId', 'firstName lastName email')
-      .populate('therapistId', 'firstName lastName specialization');
+      .populate('patientId', 'firstName lastName email photo')
+      .populate('therapistId', 'firstName lastName specialization photo');
   }
 
   async findByTherapistId(therapistId: string) {
     return this.appointmentModel
       .find({ therapistId: new Types.ObjectId(therapistId) })
-      .populate('patientId', 'firstName lastName email')
-      .populate('therapistId', 'firstName lastName specialization');
+      .populate('patientId', 'firstName lastName email photo')
+      .populate('therapistId', 'firstName lastName specialization photo');
   }
 
   async findOne(id: string) {
     const appointment = await this.appointmentModel
       .findById(id)
-      .populate('patientId', 'firstName lastName email')
-      .populate('therapistId', 'firstName lastName specialization');
+      .populate('patientId', 'firstName lastName email photo')
+      .populate('therapistId', 'firstName lastName specialization photo');
 
     if (!appointment) {
       throw new NotFoundException('Appointment not found');
@@ -62,8 +62,8 @@ export class AppointmentsService {
   async update(id: string, updateAppointmentDto: UpdateAppointmentDto) {
     const appointment = await this.appointmentModel
       .findByIdAndUpdate(id, updateAppointmentDto, { new: true })
-      .populate('patientId', 'firstName lastName email')
-      .populate('therapistId', 'firstName lastName specialization');
+      .populate('patientId', 'firstName lastName email photo')
+      .populate('therapistId', 'firstName lastName specialization photo');
 
     if (!appointment) {
       throw new NotFoundException('Appointment not found');

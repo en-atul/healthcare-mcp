@@ -450,9 +450,10 @@ export class RagService implements OnModuleInit {
       );
 
       // Get all conversation entries for this patient
+      // Note: ChromaDB's get() method doesn't guarantee order, so we'll sort by timestamp after retrieval
       const results = await this.chromaService.collection.get({
         where: { patientId },
-        limit,
+        limit: limit * 2, // Get more than needed to ensure we have enough after sorting
       });
 
       if (!results.documents || results.documents.length === 0) {
@@ -514,7 +515,13 @@ export class RagService implements OnModuleInit {
             item !== null && item !== undefined,
         );
 
-      return history;
+      // Sort by timestamp to ensure chronological order (oldest first)
+      const sortedHistory = history.sort((a, b) => 
+        new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+      );
+
+      // Apply limit after sorting to ensure we get the most recent messages
+      return sortedHistory.slice(-limit);
     } catch (error) {
       console.error('❌ Failed to get conversation history:', error);
       return [];

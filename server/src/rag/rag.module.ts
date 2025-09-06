@@ -7,7 +7,13 @@ import { AuthModule } from '../auth/auth.module';
 import { ChromaModule } from '../chroma/chroma.module';
 
 @Module({
-  imports: [AppointmentsModule, TherapistsModule, PatientsModule, AuthModule, ChromaModule],
+  imports: [
+    AppointmentsModule,
+    TherapistsModule,
+    PatientsModule,
+    AuthModule,
+    ChromaModule,
+  ],
   providers: [RagService],
   exports: [RagService],
 })

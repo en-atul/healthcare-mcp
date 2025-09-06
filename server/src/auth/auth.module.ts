@@ -6,6 +6,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { JwtAuthGuard } from './guards/jwt-auth.guard';
 import { Patient, PatientSchema } from '../patients/schemas/patient.schema';
+import { RandomUserService } from '../common/random-user.service';
 
 @Global()
 @Module({
@@ -22,7 +23,7 @@ import { Patient, PatientSchema } from '../patients/schemas/patient.schema';
     }),
   ],
   controllers: [AuthController],
-  providers: [AuthService, JwtAuthGuard],
+  providers: [AuthService, JwtAuthGuard, RandomUserService],
   exports: [AuthService, JwtModule, JwtAuthGuard],
 })
 export class AuthModule {}

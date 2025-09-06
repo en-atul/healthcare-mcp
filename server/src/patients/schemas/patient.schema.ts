@@ -28,6 +28,9 @@ export class Patient {
   @Prop()
   address: string;
 
+  @Prop()
+  photo: string;
+
   @Prop({ default: 'patient' })
   role: string;
 

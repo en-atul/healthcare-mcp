@@ -31,6 +31,9 @@ export class Therapist {
   @Prop()
   address: string;
 
+  @Prop()
+  photo: string;
+
   @Prop({ default: 'therapist' })
   role: string;
 

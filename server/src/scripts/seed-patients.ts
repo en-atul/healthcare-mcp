@@ -1,5 +1,6 @@
 import mongoose from 'mongoose';
 import bcrypt from 'bcryptjs';
+import { RandomUserService } from '../common/random-user.service';
 
 interface Patient {
   email: string;
@@ -8,6 +9,7 @@ interface Patient {
   lastName: string;
   phone: string;
   address: string;
+  photo: string;
   role: string;
 }
 
@@ -18,12 +20,15 @@ const patientSchema = new mongoose.Schema<Patient>({
   lastName: { type: String, required: true },
   phone: { type: String, required: true },
   address: { type: String, required: true },
+  photo: { type: String },
   role: { type: String, default: 'patient' },
 });
 
 const PatientModel = mongoose.model<Patient>('Patient', patientSchema);
 
-const patientsData: Omit<Patient, 'password'>[] = [
+const patientsData: (Omit<Patient, 'password' | 'photo'> & {
+  gender: 'male' | 'female';
+})[] = [
   {
     email: 'john.doe@example.com',
     firstName: 'John',
@@ -31,6 +36,7 @@ const patientsData: Omit<Patient, 'password'>[] = [
     phone: '+1-555-0201',
     address: '123 Main St, City, State 12345',
     role: 'patient',
+    gender: 'male',
   },
   {
     email: 'jane.smith@example.com',
@@ -39,6 +45,7 @@ const patientsData: Omit<Patient, 'password'>[] = [
     phone: '+1-555-0202',
     address: '456 Oak Ave, City, State 12345',
     role: 'patient',
+    gender: 'female',
   },
   {
     email: 'mike.wilson@example.com',
@@ -47,6 +54,7 @@ const patientsData: Omit<Patient, 'password'>[] = [
     phone: '+1-555-0203',
     address: '789 Pine Rd, City, State 12345',
     role: 'patient',
+    gender: 'male',
   },
 ];
 
@@ -63,15 +71,22 @@ async function seedPatients() {
     await PatientModel.deleteMany({});
     console.log('Existing patients cleared.');
 
-    console.log('Seeding patients...');
+    console.log('Fetching patient photos from Random User API...');
+    const randomUserService = new RandomUserService();
     const bcryptRounds = parseInt(process.env.BCRYPT_ROUNDS || '10', 10);
 
     const patientsWithHashedPasswords = await Promise.all(
       patientsData.map(async (patient) => {
         const hashedPassword = await bcrypt.hash('password123', bcryptRounds);
+        const photo = await randomUserService.getRandomUserPhoto(
+          patient.gender,
+          'medium',
+        );
+
         return {
           ...patient,
           password: hashedPassword,
+          photo,
         };
       }),
     );
@@ -85,6 +100,7 @@ async function seedPatients() {
       console.log(`   Email: ${patient.email}`);
       console.log(`   Phone: ${patient.phone}`);
       console.log(`   Address: ${patient.address}`);
+      console.log(`   Photo: ${patient.photo}`);
       console.log(`   Password: password123 (for testing)`);
       console.log('');
     });

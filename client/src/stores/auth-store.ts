@@ -7,6 +7,7 @@ export interface User {
   firstName: string;
   lastName: string;
   role: 'patient' | 'therapist';
+  photo?: string;
   dateOfBirth?: string;
   phone?: string;
   address?: string;

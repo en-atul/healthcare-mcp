@@ -61,6 +61,7 @@ export class McpServerService {
         experience: t.experience,
         rating: t.rating,
         email: t.email,
+        photo: t.photo,
       }));
 
       return {
@@ -97,6 +98,7 @@ export class McpServerService {
       );
 
       const therapist = await this.therapistsService.findById(therapistId);
+      const patient = await this.patientsService.findById(patientId);
 
       const cleanAppointment = {
         id: appointment._id ? appointment._id.toString() : 'unknown',
@@ -107,6 +109,11 @@ export class McpServerService {
           ? `Dr. ${therapist.firstName} ${therapist.lastName}`
           : 'Unknown Therapist',
         therapistId: therapistId,
+        therapistPhoto: therapist?.photo,
+        patientName: patient
+          ? `${patient.firstName} ${patient.lastName}`
+          : 'Unknown Patient',
+        patientPhoto: patient?.photo,
         notes: appointment.notes,
       };
 
@@ -148,6 +155,13 @@ export class McpServerService {
         const therapist = apt.therapistId as unknown as {
           firstName: string;
           lastName: string;
+          photo: string;
+          [key: string]: unknown;
+        };
+        const patient = apt.patientId as unknown as {
+          firstName: string;
+          lastName: string;
+          photo: string;
           [key: string]: unknown;
         };
         return {
@@ -157,6 +171,9 @@ export class McpServerService {
           status: apt.status,
           therapistName: `Dr. ${therapist.firstName} ${therapist.lastName}`,
           therapistId: apt.therapistId,
+          therapistPhoto: therapist.photo,
+          patientName: `${patient.firstName} ${patient.lastName}`,
+          patientPhoto: patient.photo,
           notes: apt.notes,
         };
       });
@@ -205,13 +222,27 @@ export class McpServerService {
       const therapist = appointment.therapistId as unknown as {
         firstName: string;
         lastName: string;
+        photo: string;
+        [key: string]: unknown;
+      };
+
+      const patient = appointment.patientId as unknown as {
+        firstName: string;
+        lastName: string;
+        photo: string;
         [key: string]: unknown;
       };
 
       const cancelledAppointment = {
         id: appointment._id ? appointment._id.toString() : 'unknown',
         date: appointment.appointmentDate,
+        duration: appointment.duration,
+        therapistId: appointment.therapistId._id ? appointment.therapistId._id.toString() : 'unknown',
         therapistName: `Dr. ${therapist.firstName} ${therapist.lastName}`,
+        therapistPhoto: therapist.photo,
+        patientName: `${patient.firstName} ${patient.lastName}`,
+        patientPhoto: patient.photo,
+        notes: appointment.notes,
         cancellationReason: cancellationReason || 'Cancelled by patient',
         status: 'cancelled',
       };
@@ -249,6 +280,7 @@ export class McpServerService {
         phone: patient.phone,
         address: patient.address,
         dateOfBirth: patient.dateOfBirth,
+        photo: patient.photo,
       };
 
       return {

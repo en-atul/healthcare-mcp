@@ -10,16 +10,18 @@ import * as bcrypt from 'bcryptjs';
 import { Patient, PatientDocument } from '../patients/schemas/patient.schema';
 import { LoginDto, RegisterPatientDto } from './dto/auth.dto';
 import { JwtPayload } from '../common/auth.utils';
+import { RandomUserService } from '../common/random-user.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     @InjectModel(Patient.name) private patientModel: Model<PatientDocument>,
     private jwtService: JwtService,
+    private randomUserService: RandomUserService,
   ) {}
 
   async registerPatient(registerDto: RegisterPatientDto) {
-    const { email, password, ...rest } = registerDto;
+    const { email, password, gender, ...rest } = registerDto;
 
     // Check if patient already exists
     const existingPatient = await this.patientModel.findOne({ email });
@@ -30,10 +32,18 @@ export class AuthService {
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
+    // Generate photo based on gender (default to 'male' if not provided)
+    const userGender = gender || 'male';
+    const photo = await this.randomUserService.getRandomUserPhoto(
+      userGender,
+      'medium',
+    );
+
     // Create patient
     const patient = new this.patientModel({
       email,
       password: hashedPassword,
+      photo,
       ...rest,
     });
 
@@ -54,6 +64,7 @@ export class AuthService {
         firstName: savedPatient.firstName,
         lastName: savedPatient.lastName,
         role: savedPatient.role,
+        photo: savedPatient.photo,
       },
     };
   }
@@ -88,6 +99,7 @@ export class AuthService {
         firstName: patient.firstName,
         lastName: patient.lastName,
         role: patient.role,
+        photo: patient.photo,
       },
     };
   }

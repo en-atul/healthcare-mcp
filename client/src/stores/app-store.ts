@@ -4,8 +4,10 @@ export interface Appointment {
   _id: string;
   therapistId: string;
   therapistName?: string;
+  therapistPhoto?: string;
   patientId: string;
   patientName?: string;
+  patientPhoto?: string;
   appointmentDate: string;
   duration: number;
   status: 'scheduled' | 'confirmed' | 'completed' | 'cancelled';
@@ -29,7 +31,13 @@ export interface ChatMessage {
   content: string;
   role: 'user' | 'assistant';
   timestamp: Date;
-  type?: 'text' | 'list_therapists' | 'list_appointments' | 'book_appointment' | 'cancel_appointment' | 'get_profile';
+  type?:
+    | 'text'
+    | 'list_therapists'
+    | 'list_appointments'
+    | 'book_appointment'
+    | 'cancel_appointment'
+    | 'get_profile';
   data?: unknown;
 }
 
@@ -80,7 +88,11 @@ interface AppState {
   fetchTherapists: () => Promise<void>;
   fetchChatHistory: (page?: number, append?: boolean) => Promise<void>;
   loadMoreChatHistory: () => Promise<void>;
-  bookAppointment: (therapistId: string, date: string, time: string) => Promise<void>;
+  bookAppointment: (
+    therapistId: string,
+    date: string,
+    time: string,
+  ) => Promise<void>;
   cancelAppointment: (appointmentId: string) => Promise<void>;
   sendChatMessage: (message: string) => Promise<void>;
 }
@@ -107,18 +119,22 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // Appointment actions
   setAppointments: (appointments) => set({ appointments }),
-  addAppointment: (appointment) => set((state) => ({ 
-    appointments: [...state.appointments, appointment] 
-  })),
-  updateAppointment: (id, updates) => set((state) => ({
-    appointments: state.appointments.map(apt => 
-      apt._id === id ? { ...apt, ...updates } : apt
-    )
-  })),
-  deleteAppointment: (id) => set((state) => ({
-    appointments: state.appointments.filter(apt => apt._id !== id)
-  })),
-  setSelectedAppointment: (appointment) => set({ selectedAppointment: appointment }),
+  addAppointment: (appointment) =>
+    set((state) => ({
+      appointments: [...state.appointments, appointment],
+    })),
+  updateAppointment: (id, updates) =>
+    set((state) => ({
+      appointments: state.appointments.map((apt) =>
+        apt._id === id ? { ...apt, ...updates } : apt,
+      ),
+    })),
+  deleteAppointment: (id) =>
+    set((state) => ({
+      appointments: state.appointments.filter((apt) => apt._id !== id),
+    })),
+  setSelectedAppointment: (appointment) =>
+    set({ selectedAppointment: appointment }),
   setLoadingAppointments: (loading) => set({ isLoadingAppointments: loading }),
 
   // Therapist actions
@@ -127,16 +143,24 @@ export const useAppStore = create<AppState>((set, get) => ({
   setLoadingTherapists: (loading) => set({ isLoadingTherapists: loading }),
 
   // Chat actions
-  addChatMessage: (message) => set((state) => ({
-    chatMessages: [...state.chatMessages, message]
-  })),
+  addChatMessage: (message) =>
+    set((state) => {
+      const newMessages = [...state.chatMessages, message];
+      // Sort to ensure chronological order (oldest first)
+      return {
+        chatMessages: newMessages.sort((a, b) => 
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        ),
+      };
+    }),
   setChatMessages: (messages) => set({ chatMessages: messages }),
   setChatInput: (input) => set({ chatInput: input }),
   setChatLoading: (loading) => set({ isChatLoading: loading }),
   setChatHistoryLoading: (loading) => set({ isChatHistoryLoading: loading }),
   setHasMoreChatHistory: (hasMore) => set({ hasMoreChatHistory: hasMore }),
   setChatPage: (page) => set({ chatPage: page }),
-  clearChat: () => set({ chatMessages: [], chatPage: 1, hasMoreChatHistory: true }),
+  clearChat: () =>
+    set({ chatMessages: [], chatPage: 1, hasMoreChatHistory: true }),
 
   // UI actions
   setAppointmentModalOpen: (open) => set({ isAppointmentModalOpen: open }),
@@ -146,10 +170,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   fetchAppointments: async () => {
     const state = get();
     if (state.isLoadingAppointments) {
-      console.log('fetchAppointments: Already loading, skipping duplicate call');
+      console.log(
+        'fetchAppointments: Already loading, skipping duplicate call',
+      );
       return;
     }
-    
+
     set({ isLoadingAppointments: true });
     try {
       const { apiClient } = await import('@/lib/api-client');
@@ -179,87 +205,128 @@ export const useAppStore = create<AppState>((set, get) => ({
       console.log('fetchChatHistory: Already loading, skipping duplicate call');
       return;
     }
-    
+
     try {
       set({ isChatHistoryLoading: true });
       const { apiClient } = await import('@/lib/api-client');
       const response = await apiClient.getChatHistory(20, page); // 20 messages per page
-      
+
       console.log('Chat history response received:', response);
-      
+
       // Extract the data array from the response
       const historyData = response?.data || response || [];
-      
+
       console.log('History data to process:', historyData);
-      
+
       // Convert history to ChatMessage format
-      const newMessages: ChatMessage[] = (historyData || []).map((item: unknown) => {
-        const chatItem = item as {
-          _id?: string;
-          id?: string;
-          message?: string;
-          content?: string;
-          text?: string;
-          answer?: string; // Add answer field
-          type?: string;
-          role?: string;
-          timestamp?: string;
-          createdAt?: string;
-          actionResult?: unknown;
-          rawData?: unknown;
-          action?: string; // Add action field
-        };
-        
-        // Determine message type based on action
-        let messageType: 'text' | 'list_therapists' | 'list_appointments' | 'book_appointment' | 'cancel_appointment' | 'get_profile' | undefined;
-        if (chatItem.action) {
-          switch (chatItem.action) {
-            case 'list_therapists':
-              messageType = 'list_therapists';
-              break;
-            case 'list_appointments':
-              messageType = 'list_appointments';
-              break;
-            case 'book_appointment':
-              messageType = 'book_appointment';
-              break;
-            case 'cancel_appointment':
-              messageType = 'cancel_appointment';
-              break;
-            case 'get_profile':
-              messageType = 'get_profile';
-              break;
-            default:
-              messageType = 'text';
+      const newMessages: ChatMessage[] = (historyData || []).map(
+        (item: unknown) => {
+          const chatItem = item as {
+            _id?: string;
+            id?: string;
+            message?: string;
+            content?: string;
+            text?: string;
+            answer?: string; // Add answer field
+            type?: string;
+            role?: string;
+            timestamp?: string;
+            createdAt?: string;
+            actionResult?: unknown;
+            rawData?: unknown;
+            action?: string; // Add action field
+          };
+
+          // Determine message type based on action
+          let messageType:
+            | 'text'
+            | 'list_therapists'
+            | 'list_appointments'
+            | 'book_appointment'
+            | 'cancel_appointment'
+            | 'get_profile'
+            | undefined;
+          if (chatItem.action) {
+            switch (chatItem.action) {
+              case 'list_therapists':
+                messageType = 'list_therapists';
+                break;
+              case 'list_appointments':
+                messageType = 'list_appointments';
+                break;
+              case 'book_appointment':
+                messageType = 'book_appointment';
+                break;
+              case 'cancel_appointment':
+                messageType = 'cancel_appointment';
+                break;
+              case 'get_profile':
+                messageType = 'get_profile';
+                break;
+              default:
+                messageType = 'text';
+            }
+          } else {
+            messageType = 'text';
           }
-        } else {
-          messageType = 'text';
-        }
-        
-        return {
-          id: chatItem._id || chatItem.id || Date.now().toString() + Math.random(),
-          content: chatItem.answer || chatItem.message || chatItem.content || chatItem.text || '',
-          role: (chatItem.type || chatItem.role || 'user') as 'user' | 'assistant',
-          timestamp: new Date(chatItem.timestamp || chatItem.createdAt || new Date()),
-          type: messageType,
-          data: chatItem.actionResult || chatItem.rawData || (item as { data?: unknown }).data,
-        };
-      });
-      
+
+          return {
+            id:
+              chatItem._id ||
+              chatItem.id ||
+              Date.now().toString() + Math.random(),
+            content:
+              chatItem.answer ||
+              chatItem.message ||
+              chatItem.content ||
+              chatItem.text ||
+              '',
+            role: (chatItem.type || chatItem.role || 'user') as
+              | 'user'
+              | 'assistant',
+            timestamp: new Date(
+              chatItem.timestamp || chatItem.createdAt || new Date(),
+            ),
+            type: messageType,
+            data:
+              chatItem.actionResult ||
+              chatItem.rawData ||
+              (item as { data?: unknown }).data,
+          };
+        },
+      );
+
       console.log('Converted chat messages:', newMessages);
       console.log('First message details:', newMessages[0]);
-      
+
       if (append) {
         // Append older messages to the beginning (for infinite scroll)
-        set((state) => ({
-          chatMessages: [...newMessages, ...state.chatMessages],
-          chatPage: page,
-          hasMoreChatHistory: newMessages.length === 20, // If we got less than 20, no more pages
-        }));
+        set((state) => {
+          // Filter out duplicates based on message ID
+          const existingIds = new Set(state.chatMessages.map((msg) => msg.id));
+          const uniqueNewMessages = newMessages.filter(
+            (msg) => !existingIds.has(msg.id),
+          );
+
+          const combinedMessages = [...state.chatMessages, ...uniqueNewMessages];
+          // Sort to ensure chronological order (oldest first)
+          const sortedCombinedMessages = combinedMessages.sort((a, b) => 
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          );
+          
+          return {
+            chatMessages: sortedCombinedMessages,
+            chatPage: page,
+            hasMoreChatHistory: newMessages.length === 20, // If we got less than 20, no more pages
+          };
+        });
       } else {
-        // Replace messages (initial load) - backend handles ordering
+        // Replace messages (initial load) - sort to ensure chronological order (oldest first)
+        const sortedMessages = newMessages.sort((a, b) => 
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
         set({
-          chatMessages: newMessages,
+          chatMessages: sortedMessages,
           chatPage: page,
           hasMoreChatHistory: newMessages.length === 20,
         });
@@ -275,7 +342,7 @@ export const useAppStore = create<AppState>((set, get) => ({
   loadMoreChatHistory: async () => {
     const { chatPage, hasMoreChatHistory, isChatHistoryLoading } = get();
     if (!hasMoreChatHistory || isChatHistoryLoading) return;
-    
+
     await get().fetchChatHistory(chatPage + 1, true);
   },
 
@@ -284,10 +351,10 @@ export const useAppStore = create<AppState>((set, get) => ({
       const { apiClient } = await import('@/lib/api-client');
       // Convert time to appointment date with time
       const appointmentDateTime = new Date(`${date}T${time}`);
-      const appointment = await apiClient.bookAppointment({ 
-        therapistId, 
+      const appointment = await apiClient.bookAppointment({
+        therapistId,
         appointmentDate: appointmentDateTime.toISOString(),
-        duration: 60 // Default 60 minutes
+        duration: 60, // Default 60 minutes
       });
       get().addAppointment(appointment);
     } catch (error) {
@@ -319,28 +386,37 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       const { apiClient } = await import('@/lib/api-client');
       const data = await apiClient.sendChatMessage(message);
-      
+
       console.log('Chat response data:', data);
-      
+
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         content: data.response,
         role: data.type === 'assistant' ? 'assistant' : 'user', // Use server-provided type
-        timestamp: new Date(),
+        timestamp: new Date(), // This will be updated when the message is stored on server
         type: data.action, // Use action as type for proper rendering
         data: data.data,
       };
-      
+
       get().addChatMessage(assistantMessage);
 
       // Check if the response contains appointment-related actions
       const responseData = data as { action?: string };
-      if (responseData.action === 'book_appointment' || responseData.action === 'cancel_appointment') {
-        console.log('Appointment action detected:', responseData.action, '- Re-fetching appointments');
+      if (
+        responseData.action === 'book_appointment' ||
+        responseData.action === 'cancel_appointment'
+      ) {
+        console.log(
+          'Appointment action detected:',
+          responseData.action,
+          '- Re-fetching appointments',
+        );
         // Re-fetch appointments to update the appointments panel
-        get().fetchAppointments().catch(() => {
-          console.error('Failed to re-fetch appointments after action');
-        });
+        get()
+          .fetchAppointments()
+          .catch(() => {
+            console.error('Failed to re-fetch appointments after action');
+          });
       }
     } catch (error) {
       console.error('Chat error:', error);
