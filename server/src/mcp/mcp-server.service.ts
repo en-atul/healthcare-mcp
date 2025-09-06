@@ -54,6 +54,7 @@ export class McpServerService {
       const therapists = await this.therapistsService.findAll();
 
       const cleanTherapists = therapists.map((t) => ({
+        id: t._id ? t._id.toString() : 'unknown',
         firstName: t.firstName,
         lastName: t.lastName,
         specialization: t.specialization,
@@ -62,29 +63,10 @@ export class McpServerService {
         email: t.email,
       }));
 
-      const htmlResponse = `
-        <h3>Available Therapists</h3>
-        <ul>
-          ${therapists
-            .map(
-              (t) => `
-            <li>
-              <strong>Dr. ${t.firstName} ${t.lastName}</strong><br>
-              <em>${t.specialization}</em><br>
-              ${t.experience} years experience • ⭐ ${t.rating}/5<br>
-              📧 ${t.email}
-            </li>
-          `,
-            )
-            .join('')}
-        </ul>
-      `;
-
       return {
         success: true,
         data: cleanTherapists,
         message: `Found ${therapists.length} therapists`,
-        formattedResponse: htmlResponse,
       };
     } catch (error) {
       return {
@@ -117,32 +99,21 @@ export class McpServerService {
       const therapist = await this.therapistsService.findById(therapistId);
 
       const cleanAppointment = {
+        id: appointment._id ? appointment._id.toString() : 'unknown',
         date: appointment.appointmentDate,
         duration: appointment.duration,
         status: appointment.status,
         therapistName: therapist
           ? `Dr. ${therapist.firstName} ${therapist.lastName}`
           : 'Unknown Therapist',
+        therapistId: therapistId,
         notes: appointment.notes,
       };
-
-      const htmlResponse = `
-        <div class="appointment-confirmation">
-          <h3>✅ Appointment Booked Successfully!</h3>
-          <div class="appointment-details">
-            <p><strong>Date:</strong> ${new Date(appointmentDate).toLocaleString()}</p>
-            <p><strong>Duration:</strong> ${duration} minutes</p>
-            <p><strong>Therapist:</strong> ${therapist ? `Dr. ${therapist.firstName} ${therapist.lastName}` : 'Unknown'}</p>
-            ${notes ? `<p><strong>Notes:</strong> ${notes}</p>` : ''}
-          </div>
-        </div>
-      `;
 
       return {
         success: true,
         data: cleanAppointment,
         message: 'Appointment booked successfully',
-        formattedResponse: htmlResponse,
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) {
@@ -170,7 +141,6 @@ export class McpServerService {
           success: true,
           data: [],
           message: 'No appointments found',
-          formattedResponse: '<p>You have no upcoming appointments.</p>',
         };
       }
 
@@ -181,52 +151,20 @@ export class McpServerService {
           [key: string]: unknown;
         };
         return {
+          id: apt._id ? apt._id.toString() : 'unknown',
           date: apt.appointmentDate,
           duration: apt.duration,
           status: apt.status,
           therapistName: `Dr. ${therapist.firstName} ${therapist.lastName}`,
+          therapistId: apt.therapistId,
           notes: apt.notes,
         };
       });
-
-      const htmlResponse = `
-        <h3>Your Appointments</h3>
-        <div class="appointments-list">
-          ${appointments
-            .map((apt, index) => {
-              const therapist = apt.therapistId as unknown as {
-                firstName: string;
-                lastName: string;
-                [key: string]: unknown;
-              };
-              const statusClass =
-                apt.status === 'scheduled'
-                  ? 'status-scheduled'
-                  : apt.status === 'cancelled'
-                    ? 'status-cancelled'
-                    : apt.status === 'completed'
-                      ? 'status-completed'
-                      : 'status-default';
-              return `
-              <div class="appointment-item">
-                <h4>Appointment ${index + 1}</h4>
-                <p><strong>Date:</strong> ${new Date(apt.appointmentDate).toLocaleString()}</p>
-                <p><strong>Therapist:</strong> Dr. ${therapist.firstName} ${therapist.lastName}</p>
-                <p><strong>Duration:</strong> ${apt.duration} minutes</p>
-                <p><strong>Status:</strong> <span class="${statusClass}">${apt.status}</span></p>
-                ${apt.notes ? `<p><strong>Notes:</strong> ${apt.notes}</p>` : ''}
-              </div>
-            `;
-            })
-            .join('')}
-        </div>
-      `;
 
       return {
         success: true,
         data: cleanAppointments,
         message: `Found ${appointments.length} appointments`,
-        formattedResponse: htmlResponse,
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) {
@@ -252,7 +190,10 @@ export class McpServerService {
 
       const appointment = await this.appointmentsService.findOne(appointmentId);
 
-      if (appointment.patientId._id.toString() !== patientId) {
+      if (
+        appointment.patientId._id &&
+        appointment.patientId._id.toString() !== patientId
+      ) {
         throw new Error('You can only cancel your own appointments');
       }
 
@@ -267,21 +208,18 @@ export class McpServerService {
         [key: string]: unknown;
       };
 
-      const htmlResponse = `
-        <div class="cancellation-confirmation">
-          <h3>❌ Appointment Cancelled Successfully</h3>
-          <div class="cancelled-appointment-details">
-            <p><strong>Date:</strong> ${new Date(appointment.appointmentDate).toLocaleString()}</p>
-            <p><strong>Therapist:</strong> Dr. ${therapist.firstName} ${therapist.lastName}</p>
-            <p><strong>Reason:</strong> ${cancellationReason || 'Cancelled by patient'}</p>
-          </div>
-        </div>
-      `;
+      const cancelledAppointment = {
+        id: appointment._id ? appointment._id.toString() : 'unknown',
+        date: appointment.appointmentDate,
+        therapistName: `Dr. ${therapist.firstName} ${therapist.lastName}`,
+        cancellationReason: cancellationReason || 'Cancelled by patient',
+        status: 'cancelled',
+      };
 
       return {
         success: true,
+        data: cancelledAppointment,
         message: 'Appointment cancelled successfully',
-        formattedResponse: htmlResponse,
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) {
@@ -304,6 +242,7 @@ export class McpServerService {
       const patient = await this.patientsService.findById(patientId);
 
       const cleanProfile = {
+        id: patient._id ? patient._id.toString() : 'unknown',
         firstName: patient.firstName,
         lastName: patient.lastName,
         email: patient.email,
@@ -312,24 +251,10 @@ export class McpServerService {
         dateOfBirth: patient.dateOfBirth,
       };
 
-      const htmlResponse = `
-        <div class="patient-profile">
-          <h3>👤 Patient Profile</h3>
-          <div class="profile-details">
-            <p><strong>Name:</strong> ${patient.firstName} ${patient.lastName}</p>
-            <p><strong>Email:</strong> ${patient.email}</p>
-            <p><strong>Phone:</strong> ${patient.phone || 'Not provided'}</p>
-            <p><strong>Address:</strong> ${patient.address || 'Not provided'}</p>
-            ${patient.dateOfBirth ? `<p><strong>Date of Birth:</strong> ${new Date(patient.dateOfBirth).toLocaleDateString()}</p>` : ''}
-          </div>
-        </div>
-      `;
-
       return {
         success: true,
         data: cleanProfile,
         message: 'Profile retrieved successfully',
-        formattedResponse: htmlResponse,
       };
     } catch (error) {
       if (error instanceof UnauthorizedException) {

@@ -58,22 +58,10 @@ export class ChatController {
         messageLimit,
       );
 
-      return {
-        success: true,
-        data: history,
-        message: 'Conversation history retrieved successfully',
-        total: history.length,
-        limit: messageLimit,
-      };
+      return history;
     } catch (error) {
       console.error('❌ Error retrieving conversation history:', error);
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Unknown error',
-        data: [],
-        total: 0,
-        limit: 0,
-      };
+      return [];
     }
   }
 
@@ -98,6 +86,8 @@ export class ChatController {
         jwtToken,
       );
       console.log('📊 RAG response:', JSON.stringify(ragResponse, null, 2));
+      console.log('🔍 RAG action:', ragResponse.action);
+      console.log('🔍 RAG parameters:', ragResponse.parameters);
 
       let finalResponse = ragResponse.response;
       let actionResult: any = null;
@@ -112,44 +102,50 @@ export class ChatController {
         );
         console.log('📊 Action result:', actionResult);
 
-        // Store MCP operation result in RAG for future reference
-        if (actionResult) {
-          await this.ragService.storeMcpOperationResult(
-            this.extractPatientIdFromToken(jwtToken),
-            ragResponse.action,
-            actionResult,
-            ragResponse.parameters,
-          );
-        }
+        // Note: MCP operation result will be stored as part of the full conversation context
 
         // Update response with action result
         if (actionResult) {
-          // If actionResult has formattedResponse, use it
+          // Use the message from the action result if available
           if (
             actionResult &&
             typeof actionResult === 'object' &&
-            'formattedResponse' in actionResult
+            'message' in actionResult
           ) {
-            finalResponse = (actionResult as { formattedResponse: string })
-              .formattedResponse;
-          }
-          // If actionResult has raw data, include it in the response
-          if (
-            actionResult &&
-            typeof actionResult === 'object' &&
-            'data' in actionResult
-          ) {
-            // Keep the formatted response but also include raw data
-            const resultWithData = actionResult as {
-              formattedResponse?: string;
-              data: unknown;
-            };
-            finalResponse = resultWithData.formattedResponse || finalResponse;
+            finalResponse = (actionResult as { message: string }).message;
           }
         }
       }
 
+      // Store conversation context with full response structure
+      const fullChatResponse = {
+        type: 'assistant',
+        answer: finalResponse,
+        action: ragResponse.action,
+        parameters: ragResponse.parameters,
+        actionResult: actionResult as Record<string, unknown> | null,
+        rawData:
+          actionResult &&
+          typeof actionResult === 'object' &&
+          'data' in actionResult
+            ? (actionResult as { data: unknown }).data
+            : null,
+        timestamp: new Date().toISOString(),
+      };
+
+      await this.ragService.storeConversationContext(
+        this.extractPatientIdFromToken(jwtToken),
+        message,
+        finalResponse,
+        {
+          action: ragResponse.action,
+          parameters: ragResponse.parameters,
+        },
+        fullChatResponse,
+      );
+
       return {
+        type: 'assistant',
         answer: finalResponse,
         action: ragResponse.action,
         parameters: ragResponse.parameters,
@@ -165,8 +161,37 @@ export class ChatController {
     } catch (error) {
       console.error('❌ Error in RAG chat pipeline:', error);
       return {
+        type: 'assistant',
         answer:
           'I apologize, but I encountered an error processing your request. Please try again.',
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  }
+
+  @Post('clear-history')
+  async clearConversationHistory(@Req() req: Request) {
+    try {
+      const authorization = (req.headers as { authorization?: string })
+        ?.authorization;
+      const jwtToken = authorization?.replace('Bearer ', '');
+
+      if (!jwtToken) {
+        throw new Error('JWT token not found in request');
+      }
+
+      const patientId = this.extractPatientIdFromToken(jwtToken);
+      await this.ragService.clearConversationHistory(patientId);
+
+      return {
+        success: true,
+        message: 'Conversation history cleared successfully',
+      };
+    } catch (error) {
+      console.error('❌ Error clearing conversation history:', error);
+      return {
+        success: false,
+        message: 'Failed to clear conversation history',
         error: error instanceof Error ? error.message : 'Unknown error',
       };
     }

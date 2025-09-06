@@ -12,7 +12,7 @@ import { useAppStore } from '@/stores/app-store';
 export default function Dashboard() {
   const { isAuthenticated, user, token, isHydrated } = useAuth();
   const router = useRouter();
-  const { fetchAppointments, fetchChatHistory } = useAppStore();
+  const { fetchAppointments } = useAppStore();
 
   useEffect(() => {
     if (!isHydrated) return;
@@ -30,11 +30,9 @@ export default function Dashboard() {
         console.error('Failed to load appointments:', error);
       });
       
-      fetchChatHistory().catch((error) => {
-        console.error('Failed to load chat history:', error);
-      });
+      // Note: Chat history is loaded by the ChatInterface component
     }
-  }, [isAuthenticated, user, token, fetchAppointments, fetchChatHistory]);
+  }, [isAuthenticated, user, token, fetchAppointments]); // Added fetchAppointments back to dependencies
 
   if (!isHydrated || !isAuthenticated || !user) {
     return (

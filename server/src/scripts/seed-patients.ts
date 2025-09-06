@@ -102,4 +102,4 @@ async function seedPatients() {
   }
 }
 
-seedPatients();
+void seedPatients();

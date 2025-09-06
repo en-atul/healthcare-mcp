@@ -20,7 +20,6 @@ interface McpResponse {
   error?: string;
   message?: string;
   data?: unknown[];
-  formattedResponse?: string;
 }
 
 // Helper function to make HTTP calls to NestJS backend
@@ -86,7 +85,7 @@ server.registerTool(
             {
               type: 'text',
               text:
-                result.formattedResponse ||
+                result.message ||
                 `Found ${result.data?.length || 0} therapists`,
             },
           ],
@@ -156,8 +155,7 @@ server.registerTool(
           content: [
             {
               type: 'text',
-              text:
-                result.formattedResponse || 'Appointment booked successfully!',
+              text: result.message || 'Appointment booked successfully!',
             },
           ],
         };
@@ -210,7 +208,7 @@ server.registerTool(
             {
               type: 'text',
               text:
-                result.formattedResponse ||
+                result.message ||
                 `Found ${result.data?.length || 0} appointments`,
             },
           ],
@@ -270,9 +268,7 @@ server.registerTool(
           content: [
             {
               type: 'text',
-              text:
-                result.formattedResponse ||
-                'Appointment cancelled successfully!',
+              text: result.message || 'Appointment cancelled successfully!',
             },
           ],
         };
@@ -323,8 +319,7 @@ server.registerTool(
           content: [
             {
               type: 'text',
-              text:
-                result.formattedResponse || 'Profile retrieved successfully!',
+              text: result.message || 'Profile retrieved successfully!',
             },
           ],
         };

@@ -41,7 +41,7 @@ export class AuthService {
 
     // Generate JWT token
     const payload: JwtPayload = {
-      sub: savedPatient._id.toString(),
+      sub: savedPatient._id ? savedPatient._id.toString() : '',
       email: savedPatient.email,
       role: savedPatient.role,
     };
@@ -75,7 +75,7 @@ export class AuthService {
 
     // Generate JWT token
     const payload: JwtPayload = {
-      sub: patient._id.toString(),
+      sub: patient._id ? patient._id.toString() : '',
       email: patient.email,
       role: patient.role,
     };

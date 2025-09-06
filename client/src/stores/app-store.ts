@@ -29,7 +29,7 @@ export interface ChatMessage {
   content: string;
   role: 'user' | 'assistant';
   timestamp: Date;
-  type?: 'text' | 'appointment' | 'therapist_list' | 'profile';
+  type?: 'text' | 'list_therapists' | 'list_appointments' | 'book_appointment' | 'cancel_appointment' | 'get_profile';
   data?: unknown;
 }
 
@@ -144,6 +144,12 @@ export const useAppStore = create<AppState>((set, get) => ({
 
   // API actions
   fetchAppointments: async () => {
+    const state = get();
+    if (state.isLoadingAppointments) {
+      console.log('fetchAppointments: Already loading, skipping duplicate call');
+      return;
+    }
+    
     set({ isLoadingAppointments: true });
     try {
       const { apiClient } = await import('@/lib/api-client');
@@ -168,6 +174,12 @@ export const useAppStore = create<AppState>((set, get) => ({
   },
 
   fetchChatHistory: async (page = 1, append = false) => {
+    const state = get();
+    if (state.isChatHistoryLoading) {
+      console.log('fetchChatHistory: Already loading, skipping duplicate call');
+      return;
+    }
+    
     try {
       set({ isChatHistoryLoading: true });
       const { apiClient } = await import('@/lib/api-client');
@@ -188,22 +200,54 @@ export const useAppStore = create<AppState>((set, get) => ({
           message?: string;
           content?: string;
           text?: string;
+          answer?: string; // Add answer field
           type?: string;
           role?: string;
           timestamp?: string;
           createdAt?: string;
+          actionResult?: unknown;
+          rawData?: unknown;
+          action?: string; // Add action field
         };
+        
+        // Determine message type based on action
+        let messageType: 'text' | 'list_therapists' | 'list_appointments' | 'book_appointment' | 'cancel_appointment' | 'get_profile' | undefined;
+        if (chatItem.action) {
+          switch (chatItem.action) {
+            case 'list_therapists':
+              messageType = 'list_therapists';
+              break;
+            case 'list_appointments':
+              messageType = 'list_appointments';
+              break;
+            case 'book_appointment':
+              messageType = 'book_appointment';
+              break;
+            case 'cancel_appointment':
+              messageType = 'cancel_appointment';
+              break;
+            case 'get_profile':
+              messageType = 'get_profile';
+              break;
+            default:
+              messageType = 'text';
+          }
+        } else {
+          messageType = 'text';
+        }
+        
         return {
           id: chatItem._id || chatItem.id || Date.now().toString() + Math.random(),
-          content: chatItem.message || chatItem.content || chatItem.text || '',
+          content: chatItem.answer || chatItem.message || chatItem.content || chatItem.text || '',
           role: (chatItem.type || chatItem.role || 'user') as 'user' | 'assistant',
           timestamp: new Date(chatItem.timestamp || chatItem.createdAt || new Date()),
-          type: chatItem.type as 'text' | 'appointment' | 'therapist_list' | 'profile' | undefined,
-          data: (item as { data?: unknown }).data,
+          type: messageType,
+          data: chatItem.actionResult || chatItem.rawData || (item as { data?: unknown }).data,
         };
       });
       
       console.log('Converted chat messages:', newMessages);
+      console.log('First message details:', newMessages[0]);
       
       if (append) {
         // Append older messages to the beginning (for infinite scroll)
@@ -213,9 +257,9 @@ export const useAppStore = create<AppState>((set, get) => ({
           hasMoreChatHistory: newMessages.length === 20, // If we got less than 20, no more pages
         }));
       } else {
-        // Replace messages (initial load) - reverse order so newest are at bottom
+        // Replace messages (initial load) - backend handles ordering
         set({
-          chatMessages: newMessages.reverse(),
+          chatMessages: newMessages,
           chatPage: page,
           hasMoreChatHistory: newMessages.length === 20,
         });
@@ -276,12 +320,14 @@ export const useAppStore = create<AppState>((set, get) => ({
       const { apiClient } = await import('@/lib/api-client');
       const data = await apiClient.sendChatMessage(message);
       
+      console.log('Chat response data:', data);
+      
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         content: data.response,
-        role: 'assistant',
+        role: data.type === 'assistant' ? 'assistant' : 'user', // Use server-provided type
         timestamp: new Date(),
-        type: data.type,
+        type: data.action, // Use action as type for proper rendering
         data: data.data,
       };
       
@@ -296,7 +342,8 @@ export const useAppStore = create<AppState>((set, get) => ({
           console.error('Failed to re-fetch appointments after action');
         });
       }
-    } catch {
+    } catch (error) {
+      console.error('Chat error:', error);
       const errorMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         content: 'Sorry, I encountered an error. Please try again.',

@@ -99,6 +99,15 @@ export class RagService implements OnModuleInit {
     message: string,
     response: string,
     metadata: Record<string, unknown> = {},
+    fullChatResponse?: {
+      type: string;
+      answer: string;
+      action?: string;
+      parameters?: Record<string, unknown>;
+      actionResult?: Record<string, unknown> | null;
+      rawData?: unknown;
+      timestamp?: string;
+    },
   ) {
     try {
       if (!this.collection) {
@@ -108,22 +117,70 @@ export class RagService implements OnModuleInit {
         return;
       }
 
-      const document = new Document({
-        pageContent: `User: ${message}\nAssistant: ${response}`,
+      // Create user message
+      const userMessage = {
+        type: 'user',
+        answer: message,
+        action: null,
+        parameters: null,
+        actionResult: null,
+        rawData: null,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Create assistant message with full structure
+      const assistantMessage = fullChatResponse || {
+        type: 'assistant',
+        answer: response,
+        action: metadata.action || null,
+        parameters: metadata.parameters || null,
+        actionResult: null,
+        rawData: null,
+        timestamp: new Date().toISOString(),
+      };
+
+      // Store user message
+      const userDocument = new Document({
+        pageContent: `User: ${userMessage.answer}`,
         metadata: {
           patientId,
-          timestamp: new Date().toISOString(),
+          timestamp: userMessage.timestamp,
+          messageType: 'user',
+          fullMessage: JSON.stringify(userMessage),
           ...this.sanitizeMetadata(metadata),
         },
       });
 
-      const embedding = await this.embeddings.embedQuery(document.pageContent);
-
+      const userEmbedding = await this.embeddings.embedQuery(
+        userDocument.pageContent,
+      );
       await this.collection.add({
-        ids: [`${patientId}_${Date.now()}`],
-        embeddings: [embedding],
-        documents: [document.pageContent],
-        metadatas: [document.metadata],
+        ids: [`${patientId}_user_${Date.now()}`],
+        embeddings: [userEmbedding],
+        documents: [userDocument.pageContent],
+        metadatas: [userDocument.metadata],
+      });
+
+      // Store assistant message
+      const assistantDocument = new Document({
+        pageContent: `Assistant: ${assistantMessage.answer}`,
+        metadata: {
+          patientId,
+          timestamp: assistantMessage.timestamp || new Date().toISOString(),
+          messageType: 'assistant',
+          fullMessage: JSON.stringify(assistantMessage),
+          ...this.sanitizeMetadata(metadata),
+        },
+      });
+
+      const assistantEmbedding = await this.embeddings.embedQuery(
+        assistantDocument.pageContent,
+      );
+      await this.collection.add({
+        ids: [`${patientId}_assistant_${Date.now() + 1}`],
+        embeddings: [assistantEmbedding],
+        documents: [assistantDocument.pageContent],
+        metadatas: [assistantDocument.metadata],
       });
 
       console.log('✅ Conversation context stored in ChromaDB');
@@ -155,7 +212,7 @@ export class RagService implements OnModuleInit {
             | Array<{
                 firstName: string;
                 lastName: string;
-                _id: { toString(): string };
+                _id?: { toString(): string } | string;
                 specialization: string;
                 email: string;
               }>
@@ -165,14 +222,20 @@ export class RagService implements OnModuleInit {
             therapists
               ?.map(
                 (t) =>
-                  `- Dr. ${t.firstName} ${t.lastName} (ID: ${t._id.toString()}) - ${t.specialization} - ${t.email}`,
+                  `- Dr. ${t.firstName} ${t.lastName} (ID: ${t._id ? (typeof t._id === 'string' ? t._id : t._id.toString()) : 'N/A'}) - ${t.specialization} - ${t.email}`,
               )
               .join('\n') || 'No therapists found'
           }`;
           operationMetadata.operationType = 'therapist_list';
           operationMetadata.therapistCount = therapists?.length || 0;
           operationMetadata.therapistIds = therapists
-            ?.map((t) => t._id.toString())
+            ?.map((t) =>
+              t._id
+                ? typeof t._id === 'string'
+                  ? t._id
+                  : t._id.toString()
+                : 'N/A',
+            )
             .join(',');
           break;
         }
@@ -180,7 +243,7 @@ export class RagService implements OnModuleInit {
         case 'list_appointments': {
           const appointments = result.data as
             | Array<{
-                _id: { toString(): string };
+                _id?: { toString(): string } | string;
                 appointmentDate: string | Date;
                 status: string;
                 duration: number;
@@ -195,14 +258,20 @@ export class RagService implements OnModuleInit {
             appointments
               ?.map(
                 (apt) =>
-                  `- ID: ${apt._id.toString()}, Date: ${new Date(apt.appointmentDate).toLocaleString()}, Status: ${apt.status}, Duration: ${apt.duration}min, Therapist: ${apt.therapistId?.firstName || 'Unknown'} ${apt.therapistId?.lastName || ''}`,
+                  `- ID: ${apt._id ? (typeof apt._id === 'string' ? apt._id : apt._id.toString()) : 'N/A'}, Date: ${new Date(apt.appointmentDate).toLocaleString()}, Status: ${apt.status}, Duration: ${apt.duration}min, Therapist: ${apt.therapistId?.firstName || 'Unknown'} ${apt.therapistId?.lastName || ''}`,
               )
               .join('\n') || 'No appointments found'
           }`;
           operationMetadata.operationType = 'appointment_list';
           operationMetadata.appointmentCount = appointments?.length || 0;
           operationMetadata.appointmentIds = appointments
-            ?.map((apt) => apt._id.toString())
+            ?.map((apt) =>
+              apt._id
+                ? typeof apt._id === 'string'
+                  ? apt._id
+                  : apt._id.toString()
+                : 'N/A',
+            )
             .join(',');
           break;
         }
@@ -210,7 +279,7 @@ export class RagService implements OnModuleInit {
         case 'book_appointment': {
           const appointment = result.data as
             | {
-                _id?: { toString(): string };
+                _id?: { toString(): string } | string;
                 appointmentDate?: string | Date;
                 duration?: number;
                 therapistId?: {
@@ -220,9 +289,14 @@ export class RagService implements OnModuleInit {
               }
             | undefined;
 
-          documentContent = `Appointment booked successfully:\n- ID: ${appointment?._id?.toString() || 'N/A'}\n- Date: ${appointment?.appointmentDate ? new Date(appointment.appointmentDate).toLocaleString() : 'N/A'}\n- Duration: ${appointment?.duration || 'N/A'}min\n- Therapist: ${appointment?.therapistId?.firstName || 'Unknown'} ${appointment?.therapistId?.lastName || ''}`;
+          const appointmentId = appointment?._id
+            ? typeof appointment._id === 'string'
+              ? appointment._id
+              : appointment._id.toString()
+            : 'N/A';
+          documentContent = `Appointment booked successfully:\n- ID: ${appointmentId}\n- Date: ${appointment?.appointmentDate ? new Date(appointment.appointmentDate).toLocaleString() : 'N/A'}\n- Duration: ${appointment?.duration || 'N/A'}min\n- Therapist: ${appointment?.therapistId?.firstName || 'Unknown'} ${appointment?.therapistId?.lastName || ''}`;
           operationMetadata.operationType = 'appointment_booked';
-          operationMetadata.appointmentId = appointment?._id?.toString();
+          operationMetadata.appointmentId = appointmentId;
           operationMetadata.appointmentDate =
             appointment?.appointmentDate instanceof Date
               ? appointment.appointmentDate.toISOString()
@@ -341,7 +415,7 @@ export class RagService implements OnModuleInit {
       const appointments =
         await this.appointmentsService.findByPatientId(patientId);
       return appointments.map((apt) => ({
-        id: apt._id.toString(),
+        id: apt._id ? apt._id.toString() : 'unknown',
         date: apt.appointmentDate,
         duration: apt.duration,
         status: apt.status,
@@ -359,11 +433,13 @@ export class RagService implements OnModuleInit {
     limit: number = 50,
   ): Promise<
     Array<{
-      id: string;
+      type: string;
+      answer: string;
+      action?: string | null;
+      parameters?: Record<string, unknown> | null;
+      actionResult?: Record<string, unknown> | null;
+      rawData?: unknown;
       timestamp: string;
-      type: 'user' | 'assistant' | 'system';
-      content: string;
-      metadata?: Record<string, unknown>;
     }>
   > {
     try {
@@ -378,6 +454,8 @@ export class RagService implements OnModuleInit {
         limit,
       });
 
+      console.log('-----results', results);
+
       if (!results.documents || results.documents.length === 0) {
         return [];
       }
@@ -386,85 +464,89 @@ export class RagService implements OnModuleInit {
       const history = results.documents
         .map((doc, index) => {
           const metadata = results.metadatas?.[index] || {};
-          const id = results.ids?.[index] || `msg_${index}`;
           const timestamp =
             (metadata.timestamp as string) || new Date().toISOString();
 
-          // Parse the document content to extract user and assistant messages
-          const lines = doc?.split('\n') || [];
-          const messages: Array<{
-            id: string;
-            timestamp: string;
-            type: 'user' | 'assistant' | 'system';
-            content: string;
-            metadata?: Record<string, any>;
-          }> = [];
+          // Try to parse the full message from metadata
+          if (metadata.fullMessage) {
+            try {
+              const fullMessage = JSON.parse(
+                metadata.fullMessage as string,
+              ) as {
+                type: string;
+                answer: string;
+                action?: string | null;
+                parameters?: Record<string, unknown> | null;
+                actionResult?: Record<string, unknown> | null;
+                rawData?: unknown;
+                timestamp?: string;
+              };
 
-          let currentMessage = '';
-          let currentType: 'user' | 'assistant' | 'system' = 'user';
-
-          for (const line of lines) {
-            if (line.startsWith('User: ')) {
-              // Save previous message if exists
-              if (currentMessage.trim()) {
-                messages.push({
-                  id: `${id}_${messages.length}`,
-                  timestamp: timestamp,
-                  type: currentType,
-                  content: currentMessage.trim(),
-                  metadata,
-                });
-              }
-              // Start new user message
-              currentMessage = line.replace('User: ', '');
-              currentType = 'user';
-            } else if (line.startsWith('Assistant: ')) {
-              // Save previous message if exists
-              if (currentMessage.trim()) {
-                messages.push({
-                  id: `${id}_${messages.length}`,
-                  timestamp: timestamp,
-                  type: currentType,
-                  content: currentMessage.trim(),
-                  metadata,
-                });
-              }
-              // Start new assistant message
-              currentMessage = line.replace('Assistant: ', '');
-              currentType = 'assistant';
-            } else if (line.trim()) {
-              // Continue current message
-              currentMessage += (currentMessage ? '\n' : '') + line;
+              return {
+                type: fullMessage.type,
+                answer: fullMessage.answer,
+                action: fullMessage.action,
+                parameters: fullMessage.parameters,
+                actionResult: fullMessage.actionResult,
+                rawData: fullMessage.rawData,
+                timestamp: fullMessage.timestamp || timestamp,
+              };
+            } catch (error) {
+              console.error('Failed to parse full message:', error);
             }
           }
 
-          // Add the last message
-          if (currentMessage.trim()) {
-            messages.push({
-              id: `${id}_${messages.length}`,
-              timestamp: timestamp,
-              type: currentType,
-              content: currentMessage.trim(),
-              metadata,
-            });
-          }
+          // Fallback to basic message structure
+          const messageType = (metadata.messageType as string) || 'user';
+          const content = doc || '';
 
-          return messages;
+          return {
+            type: messageType,
+            answer: content,
+            action: null,
+            parameters: null,
+            actionResult: null,
+            rawData: null,
+            timestamp: timestamp,
+          };
         })
-        .flat();
+        .filter(
+          (item): item is NonNullable<typeof item> =>
+            item !== null && item !== undefined,
+        );
 
-      history.sort(
-        (a, b) =>
-          new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime(),
-      );
+      console.log('-----fu', history);
 
-      console.log(
-        `📜 Retrieved ${history.length} conversation messages for patient ${patientId}`,
-      );
       return history;
     } catch (error) {
       console.error('❌ Failed to get conversation history:', error);
       return [];
+    }
+  }
+
+  // Clear conversation history for a patient (useful for testing)
+  async clearConversationHistory(patientId: string) {
+    try {
+      if (!this.collection) {
+        console.log('⚠️  ChromaDB not available, cannot clear history');
+        return;
+      }
+
+      // Delete all documents for this patient
+      const results = await this.collection.get({
+        where: { patientId },
+      });
+
+      if (results.ids && results.ids.length > 0) {
+        await this.collection.delete({
+          ids: results.ids,
+        });
+        console.log(
+          `✅ Cleared ${results.ids.length} conversation messages for patient ${patientId}`,
+        );
+      }
+    } catch (error) {
+      console.error('❌ Failed to clear conversation history:', error);
     }
   }
 
@@ -473,7 +555,7 @@ export class RagService implements OnModuleInit {
     try {
       const therapists = await this.therapistsService.findAll();
       return therapists.map((t) => ({
-        id: t._id.toString(),
+        id: t._id ? t._id.toString() : 'unknown',
         name: `Dr. ${t.firstName} ${t.lastName}`,
         specialization: t.specialization,
         email: t.email,
@@ -523,19 +605,12 @@ export class RagService implements OnModuleInit {
         { role: 'user', content: message },
       ]);
 
+      console.log('🤖 Raw LLM response:', response.content);
+
       // Parse response for actions
       const parsedResponse = this.parseResponse(response.content as string);
 
-      // Store conversation context
-      await this.storeConversationContext(
-        patientId,
-        message,
-        parsedResponse.response,
-        {
-          action: parsedResponse.action,
-          parameters: parsedResponse.parameters,
-        },
-      );
+      // Note: Conversation context will be stored by the chat controller with full response structure
 
       return parsedResponse;
     } catch (error) {
@@ -625,15 +700,29 @@ When the user wants to:
 - Cancel an appointment: Use appointment ID from cached context if available, otherwise call list_appointments first
 - View profile: ALWAYS call get_profile tool (returns JSON data)
 
-ALWAYS respond with action format when you need to fetch data:
-ACTION: [action_name]
-PARAMETERS: {"key": "value", "key2": "value2"}
+CRITICAL: When the user asks for specific data (therapists, appointments, profile), you MUST respond with the exact format:
 
-IMPORTANT: Parameters must be valid JSON on a single line. Example:
+ACTION: [action_name]
+PARAMETERS: {"key": "value"}
+
+Examples:
+- For "list therapists" or "show me therapists":
+ACTION: list_therapists
+PARAMETERS: {}
+
+- For "book appointment":
 ACTION: book_appointment
 PARAMETERS: {"therapistId": "507f1f77bcf86cd799439011", "appointmentDate": "2024-01-15T10:00:00", "duration": 60}
 
-The MCP tools return structured JSON data that should be passed through to the user.`;
+- For "my appointments":
+ACTION: list_appointments
+PARAMETERS: {}
+
+- For "my profile":
+ACTION: get_profile
+PARAMETERS: {}
+
+DO NOT provide natural language responses for data requests. ALWAYS use the ACTION/PARAMETERS format.`;
   }
 
   private parseResponse(response: string): {
@@ -652,6 +741,66 @@ The MCP tools return structured JSON data that should be passed through to the u
       .replace(/ACTION:\s*.+/gi, '')
       .replace(/PARAMETERS:\s*.+/gi, '')
       .trim();
+
+    // If we have an action but no parameters, try to infer parameters based on the action
+    if (actionMatch && !parametersMatch) {
+      const action = actionMatch[1].trim().toLowerCase();
+      let parameters = {};
+
+      if (
+        action === 'list_therapists' ||
+        action === 'list_appointments' ||
+        action === 'get_profile'
+      ) {
+        parameters = {};
+      }
+
+      console.log(
+        '✅ Parsed action without explicit parameters:',
+        action,
+        'with inferred parameters:',
+        parameters,
+      );
+      return {
+        response: cleanResponse,
+        action: actionMatch[1].trim(),
+        parameters,
+      };
+    }
+
+    // Fallback: Try to detect common phrases and map them to actions
+    const lowerResponse = response.toLowerCase();
+    if (
+      lowerResponse.includes('list') &&
+      (lowerResponse.includes('therapist') || lowerResponse.includes('doctor'))
+    ) {
+      console.log('✅ Detected therapist list request, mapping to action');
+      return {
+        response: cleanResponse,
+        action: 'list_therapists',
+        parameters: {},
+      };
+    }
+    if (
+      lowerResponse.includes('appointment') &&
+      (lowerResponse.includes('list') ||
+        lowerResponse.includes('show') ||
+        lowerResponse.includes('my'))
+    ) {
+      console.log('✅ Detected appointment list request, mapping to action');
+      return {
+        response: cleanResponse,
+        action: 'list_appointments',
+        parameters: {},
+      };
+    }
+    if (
+      lowerResponse.includes('profile') &&
+      (lowerResponse.includes('my') || lowerResponse.includes('show'))
+    ) {
+      console.log('✅ Detected profile request, mapping to action');
+      return { response: cleanResponse, action: 'get_profile', parameters: {} };
+    }
 
     if (actionMatch && parametersMatch) {
       try {

@@ -147,4 +147,4 @@ async function seedTherapists() {
   }
 }
 
-seedTherapists();
+void seedTherapists();

@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+// useEffect removed since appointments are loaded by Dashboard component
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -13,17 +13,11 @@ export function AppointmentsPanel() {
   const {
     appointments,
     isLoadingAppointments,
-    fetchAppointments,
     cancelAppointment,
     setAppointmentModalOpen,
   } = useAppStore();
 
-  useEffect(() => {
-    fetchAppointments().catch((error) => {
-      console.error('Failed to fetch appointments:', error);
-      toast.error('Failed to load appointments');
-    });
-  }, [fetchAppointments]);
+  // Note: Appointments are loaded by the Dashboard component
 
   const handleCancelAppointment = async (appointmentId: string) => {
     try {
