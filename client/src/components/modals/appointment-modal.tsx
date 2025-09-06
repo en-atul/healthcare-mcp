@@ -123,7 +123,6 @@ export function AppointmentModal() {
         </DialogHeader>
 
         <div className="space-y-6">
-          {/* Therapist Selection - Full Width */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Select Therapist</label>
             {isLoadingTherapists ? (
@@ -218,9 +217,7 @@ export function AppointmentModal() {
             )}
           </div>
 
-          {/* Date and Time Selection - Two Columns */}
           <div className="grid grid-cols-2 gap-4">
-            {/* Date Selection */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Select Date</label>
               <Select value={selectedDate} onValueChange={setSelectedDate}>
@@ -260,7 +257,6 @@ export function AppointmentModal() {
               </Select>
             </div>
 
-            {/* Time Selection */}
             <div className="space-y-2">
               <label className="text-sm font-medium">Select Time</label>
               <Select
@@ -282,7 +278,6 @@ export function AppointmentModal() {
             </div>
           </div>
 
-          {/* Notes */}
           <div className="space-y-2">
             <label className="text-sm font-medium">Notes (Optional)</label>
             <Input
@@ -293,7 +288,6 @@ export function AppointmentModal() {
             />
           </div>
 
-          {/* Booking Summary */}
           {selectedTherapist && selectedDate && selectedTime && (
             <Card className="bg-muted/50 !gap-4">
               <CardHeader>
@@ -326,7 +320,6 @@ export function AppointmentModal() {
             </Card>
           )}
 
-          {/* Action Buttons */}
           <div className="flex gap-3 pt-4">
             <Button
               onClick={handleBookAppointment}

@@ -2,6 +2,14 @@
 
 A learning project that demonstrates how **Model Context Protocol (MCP)** can be used to create conversational interfaces for complex technical operations. This project explores how natural language chat can simplify database interactions and system management.
 
+## 📸 Screenshots
+
+### Application Overview
+![Healthcare MCP Application](assets/screenshot.png)
+
+### Interactive Demo
+![Healthcare MCP Demo](assets/screenshot.gif)
+
 ## 🎓 Learning Objectives: Understanding MCP and Conversational AI
 
 ### What This Project Demonstrates

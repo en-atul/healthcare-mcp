@@ -178,7 +178,6 @@ export function AppointmentsPanel() {
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="relative">
-                    {/* Therapist Photo (back) */}
                     <Avatar className="h-10 w-10">
                       <AvatarImage
                         src={appointment.therapistId?.photo}
@@ -255,7 +254,6 @@ export function AppointmentsPanel() {
               >
                 <div className="flex items-center gap-3 flex-1 min-w-0">
                   <div className="relative">
-                    {/* Therapist Photo (back) */}
                     <Avatar className="h-10 w-10">
                       <AvatarImage
                         src={appointment.therapistId?.photo}
@@ -265,7 +263,6 @@ export function AppointmentsPanel() {
                         {getInitials(appointment.therapistId?.firstName, appointment.therapistId?.lastName)}
                       </AvatarFallback>
                     </Avatar>
-                    {/* Patient Photo (front, slightly offset) */}
                     <Avatar className="h-8 w-8 absolute -bottom-1 -right-1 border-2 border-white">
                       <AvatarImage
                         src={appointment.patientId?.photo}

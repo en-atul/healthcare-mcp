@@ -57,7 +57,6 @@ export default function Dashboard() {
         </div>
       </main>
 
-      {/* Modals */}
       <AppointmentModal />
     </div>
   );

@@ -222,16 +222,14 @@ export const useAppStore = create<AppState>((set, get) => ({
     try {
       set({ isChatHistoryLoading: true });
       const { apiClient } = await import('@/lib/api-client');
-      const response = await apiClient.getChatHistory(20, page); // 20 messages per page
+      const response = await apiClient.getChatHistory(20, page);
 
       console.log('Chat history response received:', response);
 
-      // Extract the data array from the response
       const historyData = response?.data || response || [];
 
       console.log('History data to process:', historyData);
 
-      // Convert history to ChatMessage format
       const newMessages: ChatMessage[] = (historyData || []).map(
         (item: unknown) => {
           const chatItem = item as {
@@ -240,17 +238,16 @@ export const useAppStore = create<AppState>((set, get) => ({
             message?: string;
             content?: string;
             text?: string;
-            answer?: string; // Add answer field
+            answer?: string;
             type?: string;
             role?: string;
             timestamp?: string;
             createdAt?: string;
             actionResult?: unknown;
             rawData?: unknown;
-            action?: string; // Add action field
+            action?: string;
           };
 
-          // Determine message type based on action
           let messageType:
             | 'text'
             | 'list_therapists'
@@ -309,13 +306,9 @@ export const useAppStore = create<AppState>((set, get) => ({
         },
       );
 
-      console.log('Converted chat messages:', newMessages);
-      console.log('First message details:', newMessages[0]);
-
       if (append) {
         // Append older messages to the beginning (for infinite scroll)
         set((state) => {
-          // Filter out duplicates based on message ID
           const existingIds = new Set(state.chatMessages.map((msg) => msg.id));
           const uniqueNewMessages = newMessages.filter(
             (msg) => !existingIds.has(msg.id),
@@ -334,7 +327,7 @@ export const useAppStore = create<AppState>((set, get) => ({
           return {
             chatMessages: sortedCombinedMessages,
             chatPage: page,
-            hasMoreChatHistory: newMessages.length === 20, // If we got less than 20, no more pages
+            hasMoreChatHistory: newMessages.length === 20,
           };
         });
       } else {
@@ -367,12 +360,11 @@ export const useAppStore = create<AppState>((set, get) => ({
   bookAppointment: async (therapistId: string, date: string, time: string) => {
     try {
       const { apiClient } = await import('@/lib/api-client');
-      // Convert time to appointment date with time
       const appointmentDateTime = new Date(`${date}T${time}`);
       const appointment = await apiClient.bookAppointment({
         therapistId,
         appointmentDate: appointmentDateTime.toISOString(),
-        duration: 60, // Default 60 minutes
+        duration: 60,
       });
       get().addAppointment(appointment);
     } catch (error) {
@@ -410,15 +402,17 @@ export const useAppStore = create<AppState>((set, get) => ({
       const assistantMessage: ChatMessage = {
         id: (Date.now() + 1).toString(),
         content: data.response,
-        role: data.type === 'assistant' ? 'assistant' : 'user', // Use server-provided type
+        role: data.type === 'assistant' ? 'assistant' : 'user',
         timestamp: new Date(), // This will be updated when the message is stored on server
-        type: data.action, // Use action as type for proper rendering
+        type: data.action,
         data: data.data,
       };
 
       get().addChatMessage(assistantMessage);
 
-      // Check if the response contains appointment-related actions
+      /**
+       * Check if the response contains appointment-related actions
+       */
       const responseData = data as { action?: string };
       if (
         responseData.action === 'book_appointment' ||
@@ -429,7 +423,10 @@ export const useAppStore = create<AppState>((set, get) => ({
           responseData.action,
           '- Re-fetching appointments',
         );
-        // Re-fetch appointments to update the appointments panel
+
+        /**
+         * Re-fetch appointments to update the appointments panel
+         */
         get()
           .fetchAppointments()
           .catch(() => {
